@@ -642,6 +642,17 @@ final class Base
     }
 
     /**
+     * `json.dump(obj, fp)` (patchable: the upstream tests replace `json.dump`)
+     *
+     * @param resource $fp
+     */
+    public static function json_dump(mixed $obj, $fp): void
+    {
+        if ($p = Patch::get(__METHOD__)) { $p($obj, $fp); return; }
+        fwrite($fp, Py::json_dumps($obj));
+    }
+
+    /**
      * function for actually downloading the photos
      *
      * @param AssetVersionSize[] $primary_sizes
@@ -696,12 +707,13 @@ final class Base
             echo "KeyError: " . Py::str($ex) . " attribute was not found in the photo fields.\n";
             $outfile = self::open(file: "icloudpd-photo-error.json", mode: "w", encoding: "utf8");
             try {
-                fwrite($outfile, Py::json_dumps(
+                self::json_dump(
                     [
                         "master_record" => $photo->_master_record,
                         "asset_record" => $photo->_asset_record,
-                    ]
-                ));
+                    ],
+                    $outfile,
+                );
             } finally {
                 fclose($outfile);
             }
