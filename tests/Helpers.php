@@ -394,13 +394,19 @@ final class Helpers
      * `setup_logger()` leaves on the `icloudpd` logger writes into the capture of the first test, not into the
      * following ones. In PHP both would write to `php://output`, the capture of every test: duplicated lines.
      */
-    public static function pytest_logging(): void
+    public static function pytest_logging(): \Closure
     {
         $root = Logging::root();
+        // what an earlier `create_logger` left on the root logger (a console handler on `sys.stdout`)
         foreach ([...$root->handlers] as $handler) {
-            $root->removeHandler($handler);
+            if ($handler instanceof StreamHandler && $handler->stream === Py::stdout()) {
+                $root->removeHandler($handler);
+            }
         }
-        $root->addHandler(new NullHandler());
+        $null_handler = null;
+        if (count($root->handlers) === 0) {
+            $root->addHandler($null_handler = new NullHandler());
+        }
 
         $icloudpd_logger = Logging::getLogger('icloudpd');
         foreach ([...$icloudpd_logger->handlers] as $handler) {
@@ -408,15 +414,25 @@ final class Helpers
                 $icloudpd_logger->removeHandler($handler);
             }
         }
+
+        // pytest's handlers go away with the test: leave the root logger as it was found
+        return function () use ($root, $null_handler): void {
+            if ($null_handler !== null) {
+                $root->removeHandler($null_handler);
+            }
+        };
     }
 
     // The tests keep the upstream `.yml` cassette names: `Vcr::use_cassette()` resolves them to the `.json.gz` files.
 
     public static function run_with_cassette(string $cassette_path, callable $f, mixed $inp): mixed
     {
-        self::pytest_logging();
-
-        return Vcr::use_cassette($cassette_path, fn() => $f($inp));
+        $restore_logging = self::pytest_logging();
+        try {
+            return Vcr::use_cassette($cassette_path, fn() => $f($inp));
+        } finally {
+            $restore_logging();
+        }
     }
 
     /**
@@ -425,12 +441,15 @@ final class Helpers
      */
     public static function run_cassette(string $cassette_path, array $params, mixed $input = null): TestResult
     {
-        self::pytest_logging();
-
-        return Vcr::use_cassette(
-            $cassette_path,
-            fn() => self::print_result_exception(self::run_main_env(self::DEFAULT_ENV, $params, $input)),
-        );
+        $restore_logging = self::pytest_logging();
+        try {
+            return Vcr::use_cassette(
+                $cassette_path,
+                fn() => self::print_result_exception(self::run_main_env(self::DEFAULT_ENV, $params, $input)),
+            );
+        } finally {
+            $restore_logging();
+        }
     }
 
     /**
