@@ -7,6 +7,7 @@ use Foundation\Core\Optional;
 use Foundation\Http\Response;
 use Foundation\Http\Session;
 use Foundation\Logging;
+use Foundation\Logging\Logger;
 use Icloudpd\Paths;
 use PyicloudIpd\AssetVersion;
 use PyicloudIpd\AssetVersion\AssetVersion as AssetVersionClass;
@@ -177,7 +178,7 @@ final class Photos
     /**
      * `logger = logging.getLogger(__name__)`
      */
-    public static function logger()
+    public static function logger(): Logger
     {
         return Logging::getLogger("pyicloud_ipd.services.photos");
     }

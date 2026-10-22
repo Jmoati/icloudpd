@@ -4,9 +4,11 @@ namespace Tests;
 
 use DateTimeInterface;
 use Foundation\Http\Request;
+use Foundation\Http\Response;
 use Foundation\Http\Session;
 use Foundation\Http\Urllib;
 use Foundation\Os;
+use Foundation\Patch;
 use Foundation\Py;
 use PyicloudIpd\AssetVersion\AssetVersion;
 use PyicloudIpd\Base\PyiCloudService;
@@ -655,6 +657,59 @@ JSON;
     }
 
     // ------------------------------------------------------------------ pure functions
+
+    /**
+     * `mock.patch.object(PhotoAsset, "versions" / "created" / "download")`, `PhotoAlbum.photos_request` and
+     * `PhotoLibrary._fetch_folders` of the upstream tests: the closure gets `$this` first.
+     */
+    public function test_patch_guards(): void
+    {
+        $asset = new PhotoAsset(['recordName' => 'ID', 'fields' => []], ['fields' => []]);
+
+        $versions = new WeakMap();
+        $versions[AssetVersionSize::ORIGINAL] = new AssetVersion(1, 'http', 'jpeg', 'blah');
+        Patch::set('PyicloudIpd\Services\Photos\PhotoAsset::versions', function ($self) use ($asset, $versions) {
+            $this->assertSame($asset, $self);
+
+            return $versions;
+        });
+        $this->assertSame($versions, $asset->versions());
+        $this->assertSame(1, count($asset->versions_with_raw_policy(RawTreatmentPolicy::AS_IS)));
+
+        $created = new \DateTimeImmutable('2018-01-01');
+        Patch::set('PyicloudIpd\Services\Photos\PhotoAsset::created', fn ($self) => $created);
+        $this->assertSame($created, $asset->created());
+
+        $response = new Response(200);
+        Patch::set('PyicloudIpd\Services\Photos\PhotoAsset::download', function ($self, $session, $url, $start) use ($asset, $response) {
+            $this->assertSame([$asset, 'http://x', 5], [$self, $url, $start]);
+
+            return $response;
+        });
+        $this->assertSame($response, $asset->download(new Session(), 'http://x', 5));
+
+        $album = new PhotoAlbum([], new Session(), 'https://endpoint', 'name', 'list', 'obj');
+        Patch::set('PyicloudIpd\Services\Photos\PhotoAlbum::photos_request', fn ($self) => $response);
+        $this->assertSame($response, $album->photos_request());
+
+        $library = (new \ReflectionClass(PhotoLibrary::class))->newInstanceWithoutConstructor();
+        $library->library_type = 'private';
+        $library->params = [];
+        $library->session = new Session();
+        $library->service_endpoint = 'https://endpoint';
+        $library->zone_id = ['zoneName' => 'PrimarySync'];
+        Patch::set('PyicloudIpd\Services\Photos\PhotoLibrary::_fetch_folders', fn ($self) => [
+            ['recordName' => '----Root-Folder----', 'fields' => []],
+            ['recordName' => 'F1', 'fields' => ['albumNameEnc' => ['value' => base64_encode('Mon album')]]],
+            ['recordName' => 'F2', 'fields' => ['isDeleted' => ['value' => 1], 'albumNameEnc' => ['value' => base64_encode('Deleted')]]],
+        ]);
+        $albums = $library->albums();
+        $this->assertContains('Mon album', array_keys($albums));
+        $this->assertNotContains('Deleted', array_keys($albums));
+        $this->assertSame('CPLContainerRelationNotDeletedByAssetDate:F1', $albums['Mon album']->obj_type);
+        $this->assertSame('<PhotoAlbum: \'Mon album\'>', $albums['Mon album']->__repr__());
+        $this->assertSame(['Time-lapse', 'Videos', 'Slo-mo', 'Bursts', 'Favorites', 'Panoramas', 'Screenshots', 'Live', 'Recently Deleted', 'Hidden', 'Mon album'], array_keys($albums));
+    }
 
     /** `AssetVersion.__eq__` ignores the checksum */
     public function test_asset_version_eq(): void
