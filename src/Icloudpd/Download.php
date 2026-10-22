@@ -3,11 +3,12 @@
 namespace Icloudpd;
 
 use Foundation\Clock;
+use Foundation\Http\RequestException;
 use Foundation\Http\Response;
 use Foundation\Logging\Logger;
 use Foundation\Os;
+use Foundation\OSError;
 use Foundation\Patch;
-use Foundation\Py;
 use Foundation\Time;
 use PyicloudIpd\AssetVersion;
 use PyicloudIpd\Base\PyiCloudService;
@@ -25,15 +26,9 @@ final class Download
     public static function update_mtime(\DateTimeInterface $created, string $download_path): void
     {
         if ($created) {
-            $created_date = null;
-            try {
-                $created_date = Clock::astimezone($created, Clock::get_localzone());
-            } catch (\ValueError | \Foundation\OSError) {
-                // We already show the timezone conversion error in base.py,
-                // when generating the download directory.
-                // So just return silently without touching the mtime.
-                return;
-            }
+            // ponytail: no `except (ValueError, OSError)` around the conversion (the "silently return
+            // without touching the mtime" branch), setTimezone() cannot overflow like astimezone()
+            $created_date = $created->setTimezone(Clock::get_localzone());
             self::set_utime($download_path, $created_date);
         }
     }
@@ -65,9 +60,9 @@ final class Download
             // get back the directory for the file to be downloaded and create it if
             // not there already
             $download_dir = Os::path_dirname($download_path);
-            Os::makedirs(name: $download_dir, exist_ok: true);
+            Os::makedirs($download_dir, exist_ok: true);
             return true;
-        } catch (\Foundation\OSError) {
+        } catch (OSError) {
             $logger->error(
                 "Could not create folder %s",
                 $download_dir,
@@ -92,6 +87,25 @@ final class Download
     }
 
     /**
+     * `base64.b32encode(data).decode()`
+     *
+     * ponytail: PHP has no base32 in the standard library (RFC 4648 alphabet, padded)
+     */
+    private static function b32encode(string $data): string
+    {
+        $alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+        $bits = "";
+        foreach (str_split($data) as $byte) {
+            $bits .= str_pad(decbin(ord($byte)), 8, "0", STR_PAD_LEFT);
+        }
+        $out = "";
+        foreach (str_split($bits, 5) as $chunk) {
+            $out .= $alphabet[bindec(str_pad($chunk, 5, "0"))];
+        }
+        return $out . str_repeat("=", (8 - strlen($out) % 8) % 8);
+    }
+
+    /**
      * Thin wrapper over the builtin `open` of this module (patched by the upstream tests).
      *
      * @return resource
@@ -101,7 +115,7 @@ final class Download
         if ($p = Patch::get(__METHOD__)) return $p($file, $mode);
         $file_obj = @fopen($file, $mode);
         if ($file_obj === false) {
-            throw new \Foundation\OSError("[Errno 2] Cannot open '{$file}'");
+            throw new OSError("[Errno 2] Cannot open '{$file}'");
         }
         return $file_obj;
     }
@@ -171,8 +185,8 @@ final class Download
             return false;
         }
 
-        $checksum = Py::b64decode($version->checksum);
-        $checksum32 = Py::b32encode($checksum);
+        $checksum = base64_decode($version->checksum);
+        $checksum32 = self::b32encode($checksum);
         $download_dir = Os::path_dirname($download_path);
         $temp_download_path = Os::path_join($download_dir, $checksum32) . ".part";
 
@@ -223,7 +237,7 @@ final class Download
                     $icloud->authenticate();
                 } else {
                     // short circuiting 0 retries
-                    if ($retries == Constants::$MAX_RETRIES) {
+                    if ($retries == Constants::MAX_RETRIES) {
                         break;
                     }
                     // you end up here when p.e. throttling by Apple happens
@@ -235,7 +249,8 @@ final class Download
                     );
                     Time::sleep($wait_time);
                 }
-            } catch (\Foundation\OSError) {
+            } catch (OSError | RequestException) {
+                // requests.exceptions.RequestException is an IOError (OSError) upstream
                 $logger->error(
                     "IOError while writing file to %s. "
                     . "You might have run out of disk space, or the file "
@@ -246,11 +261,11 @@ final class Download
                 break;
             }
             $retries = $retries + 1;
-            if ($retries >= Constants::$MAX_RETRIES) {
+            if ($retries >= Constants::MAX_RETRIES) {
                 break;
             }
         }
-        if ($retries >= Constants::$MAX_RETRIES) {
+        if ($retries >= Constants::MAX_RETRIES) {
             // Get the proper filename for error messages
             $error_filename = $filename_builder($photo);
             $logger->error(

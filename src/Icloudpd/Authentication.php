@@ -4,7 +4,8 @@ namespace Icloudpd;
 
 use Foundation\Logging\Logger;
 use Foundation\Patch;
-use Foundation\Py;
+use Foundation\StringUtils;
+use Icloudpd\Authentication\SystemExit;
 use Icloudpd\MfaProvider\MFAProvider;
 use Icloudpd\Status\StatusExchange;
 use PyicloudIpd\Base\PyiCloudService;
@@ -25,9 +26,9 @@ final class Authentication
         echo $prompt;
         $line = fgets(STDIN);
         if ($line === false) {
-            throw new \Foundation\EOFError("EOF when reading a line");
+            throw new \RuntimeException("EOF when reading a line"); // EOFError
         }
-        return rtrim($line, "\n");
+        return preg_replace('/\r?\n\z/', "", $line);
     }
 
     /**
@@ -37,8 +38,13 @@ final class Authentication
     {
         while (true) {
             try {
-                $response = Py::strip(self::input("{$message} [{$default}]: ")) ?: $default;
-                $value = Py::int($response);
+                $response = StringUtils::strip(self::input("{$message} [{$default}]: "));
+                $response = $response !== "" ? $response : $default;
+                // ponytail: int() also accepts underscores and non-ASCII digits, not here
+                if (!preg_match('/^[+-]?[0-9]+$/', $response)) {
+                    throw new \ValueError("invalid literal for int() with base 10: '{$response}'");
+                }
+                $value = (int) $response;
                 if ($min_val <= $value && $value <= $max_val) {
                     return $value;
                 } else {
@@ -139,10 +145,6 @@ final class Authentication
             client_id: $client_id,
         );
 
-        if (!$icloud) {
-            throw new \Foundation\NotImplementedError("None of providers gave password");
-        }
-
         if ($valid_password) {
             // save valid password to all providers
             foreach ($password_providers as $_ => $_pair) {
@@ -190,13 +192,13 @@ final class Authentication
         $device = $devices[$device_index];
         if (!$icloud->send_verification_code($device)) {
             $logger->error("Failed to send two-step authentication code");
-            throw new \Foundation\SystemExit(1);
+            throw new SystemExit(code: 1);
         }
 
         $code = self::prompt_string("Please enter two-step authentication code");
         if (!$icloud->validate_verification_code($device, $code)) {
             $logger->error("Failed to verify two-step authentication code");
-            throw new \Foundation\SystemExit(1);
+            throw new SystemExit(code: 1);
         }
         $logger->info(
             "Great, you're all set up. The script can now be run without "
@@ -238,7 +240,7 @@ final class Authentication
             $index_str = $devices_count > 1 ? "..{$device_index_alphabet[$devices_count - 1]}" : "";
             $index_or_code = "";
             while (true) {
-                $index_or_code = Py::strip_and_lower(
+                $index_or_code = StringUtils::strip_and_lower(
                     self::prompt_string(
                         "Please enter two-factor authentication code or device index ({$device_index_alphabet[0]}{$index_str}) to send SMS with a code"
                     )
@@ -280,7 +282,7 @@ final class Authentication
                     throw new PyiCloudFailedMFAException("Failed to send two-factor authentication code");
                 }
                 while (true) {
-                    $code = Py::strip(
+                    $code = StringUtils::strip(
                         self::prompt_string(
                             "Please enter two-factor authentication code that you received over SMS"
                         )
@@ -301,7 +303,7 @@ final class Authentication
             }
         } else {
             while (true) {
-                $code = Py::strip(self::prompt_string("Please enter two-factor authentication code"));
+                $code = StringUtils::strip(self::prompt_string("Please enter two-factor authentication code"));
                 if (mb_strlen($code) == 6 && ctype_digit($code)) {
                     break;
                 }

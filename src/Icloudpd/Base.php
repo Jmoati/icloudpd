@@ -13,6 +13,7 @@ use Foundation\Logging\Logger;
 use Foundation\Os;
 use Foundation\Patch;
 use Foundation\Py;
+use Foundation\StringUtils;
 use Foundation\Time;
 use Foundation\Tqdm;
 use Icloudpd\Config\GlobalConfig;
@@ -83,7 +84,7 @@ final class Base
             return $filename;
         }
 
-        $is_heic = str_ends_with(mb_strtolower($ext), ".heic");
+        $is_heic = Core::compose(StringUtils::endswith(".heic"), StringUtils::lower(...))($ext);
         return $name . ($is_heic ? "_HEVC.MOV" : ".MOV");
     }
 
@@ -92,11 +93,23 @@ final class Base
      */
     public static function lp_filename_original(string $filename): string
     {
-        [$name, $ext] = Os::path_splitext($filename);
-        if (!$ext) {
-            return $filename;
+        $replace_with_mov = StringUtils::replace_extension(".MOV");
+        return $replace_with_mov($filename);
+    }
+
+    /**
+     * `str.rsplit(sep, maxsplit)` for a single-character separator
+     *
+     * @return string[]
+     */
+    private static function rsplit(string $string, string $sep, int $maxsplit): array
+    {
+        $parts = explode($sep, $string);
+        if (count($parts) <= $maxsplit + 1) {
+            return $parts;
         }
-        return $name . ".MOV";
+        $tail = array_splice($parts, -$maxsplit);
+        return [implode($sep, $parts), ...$tail];
     }
 
     public static function ask_password_in_console(string $_user): ?string
@@ -126,7 +139,7 @@ final class Base
             }
         }
         if ($line === false) {
-            throw new \Foundation\EOFError("EOF when reading a line");
+            throw new \RuntimeException("EOF when reading a line"); // EOFError
         }
         return rtrim($line, "\r\n");
     }
@@ -261,7 +274,7 @@ final class Base
             return self::_process_all_users_once($global_config, $user_configs, $logger, $shared_status_exchange);
         } else {
             // Watch mode - infinite loop processing all users, then wait
-            $skip_bar = !Py::truthy(getenv("FORCE_TQDM") ?: null) && (
+            $skip_bar = !Py::truthy(Os::environ_get("FORCE_TQDM")) && (
                 $global_config->only_print_filenames
                 || $global_config->no_progress_bar
                 || !stream_isatty(STDOUT)
@@ -518,7 +531,7 @@ final class Base
         if ($offset instanceof \DateInterval) {
             return Clock::now(Clock::get_localzone())->sub($offset);
         }
-        throw new \Foundation\NotImplementedError();
+        throw new \BadMethodCallException('NotImplementedError');
     }
 
     /**
@@ -627,14 +640,11 @@ final class Base
         Counter $counter,
         PhotoAsset $photo,
     ): bool {
-        try {
-            $created_date = Clock::astimezone($photo->created(), Clock::get_localzone());
-        } catch (\ValueError | \Foundation\OSError) {
-            $logger->error("Could not convert photo created date to local timezone (%s)", $photo->created());
-            $created_date = $photo->created();
-        }
+        // ponytail: no `except (ValueError, OSError)` around the conversion ("Could not convert photo created
+        // date to local timezone"), setTimezone() cannot overflow like astimezone()
+        $created_date = $photo->created()->setTimezone(Clock::get_localzone());
 
-        if (mb_strtolower($folder_structure) === "none") {
+        if (StringUtils::lower($folder_structure) === "none") {
             $date_path = "";
         } else {
             try {
@@ -645,7 +655,7 @@ final class Base
                 // e.g. ValueError: year=5 is before 1900
                 // (https://github.com/icloud-photos-downloader/icloud_photos_downloader/issues/122)
                 // Just use the Unix epoch
-                $created_date = Clock::fromtimestamp(0);
+                $created_date = (new \DateTimeImmutable('@0'))->setTimezone(Clock::get_localzone());
                 $date_path = Py::format($folder_structure, $created_date);
             }
         }
@@ -721,10 +731,10 @@ final class Base
             if ($file_exists) {
                 if ($file_match_policy === FileMatchPolicy::NAME_SIZE_DEDUP_WITH_SUFFIX) {
                     // for later: this crashes if download-size medium is specified
-                    $file_size = Os::stat($original_download_path ?? $download_path)->st_size;
+                    $file_size = Os::stat($original_download_path ?? $download_path)["st_size"];
                     $photo_size = $version->size;
                     if ($file_size != $photo_size) {
-                        $download_path = implode("-{$photo_size}.", Py::rsplit($download_path, ".", 1));
+                        $download_path = implode("-{$photo_size}.", self::rsplit($download_path, ".", 1));
                         $logger->debug("%s deduplicated", StringHelpers::truncate_middle($download_path, 96));
                         $file_exists = Os::path_isfile($download_path);
                     }
@@ -756,13 +766,12 @@ final class Base
                     $success = $download_result;
 
                     if ($download_result) {
-                        $is_jpeg = str_ends_with(mb_strtolower($filename), ".jpg")
-                            || str_ends_with(mb_strtolower($filename), ".jpeg");
+                        $is_jpeg = Core::compose(StringUtils::endswith([".jpg", ".jpeg"]), StringUtils::lower(...));
 
                         if (
                             !$dry_run
                             && $set_exif_datetime
-                            && $is_jpeg
+                            && $is_jpeg($filename)
                             && !ExifDatetime::get_photo_exif($logger, $download_path)
                         ) {
                             // %Y:%m:%d looks wrong, but it's the correct format
@@ -821,10 +830,10 @@ final class Base
                         $lp_file_exists
                         && $file_match_policy === FileMatchPolicy::NAME_SIZE_DEDUP_WITH_SUFFIX
                     ) {
-                        $lp_file_size = Os::stat($lp_download_path)->st_size;
+                        $lp_file_size = Os::stat($lp_download_path)["st_size"];
                         $lp_photo_size = $version->size;
                         if ($lp_file_size != $lp_photo_size) {
-                            $lp_download_path = implode("-{$lp_photo_size}.", Py::rsplit($lp_download_path, ".", 1));
+                            $lp_download_path = implode("-{$lp_photo_size}.", self::rsplit($lp_download_path, ".", 1));
                             $logger->debug("%s deduplicated", StringHelpers::truncate_middle($lp_download_path, 96));
                             // Print the deduplicated filename but don't download
                             echo $lp_download_path . "\n";
@@ -833,10 +842,10 @@ final class Base
                 } else {
                     if ($lp_file_exists) {
                         if ($file_match_policy === FileMatchPolicy::NAME_SIZE_DEDUP_WITH_SUFFIX) {
-                            $lp_file_size = Os::stat($lp_download_path)->st_size;
+                            $lp_file_size = Os::stat($lp_download_path)["st_size"];
                             $lp_photo_size = $version->size;
                             if ($lp_file_size != $lp_photo_size) {
-                                $lp_download_path = implode("-{$lp_photo_size}.", Py::rsplit($lp_download_path, ".", 1));
+                                $lp_download_path = implode("-{$lp_photo_size}.", self::rsplit($lp_download_path, ".", 1));
                                 $logger->debug("%s deduplicated", StringHelpers::truncate_middle($lp_download_path, 96));
                                 $lp_file_exists = Os::path_isfile($lp_download_path);
                             }
@@ -880,7 +889,7 @@ final class Base
         PhotoAsset $photo,
         callable $filename_builder,
     ): void {
-        if ($p = Patch::get(__METHOD__)) return $p($logger, $library_object, $photo, $filename_builder);
+        if ($p = Patch::get(__METHOD__)) { $p($logger, $library_object, $photo, $filename_builder); return; }
 
         $clean_filename_local = $filename_builder($photo);
         $logger->debug("Deleting %s in iCloud...", $clean_filename_local);
@@ -973,7 +982,7 @@ final class Base
         callable $notificator,
         callable $lp_filename_generator,
     ): int {
-        $skip_bar = !Py::truthy(getenv("FORCE_TQDM") ?: null) && (
+        $skip_bar = !Py::truthy(Os::environ_get("FORCE_TQDM")) && (
             $global_config->only_print_filenames
             || $global_config->no_progress_bar
             || !stream_isatty(STDOUT)
@@ -1000,7 +1009,7 @@ final class Base
                     $notificator,
                     $append_response,
                     $user_config->cookie_directory,
-                    getenv("CLIENT_ID") ?: null,
+                    Os::environ_get("CLIENT_ID"),
                 );
 
                 // dump captured responses for debugging
@@ -1042,7 +1051,7 @@ final class Base
                     } else {
                         if (!$user_config->directory) {
                             // should be checked upstream
-                            throw new \Foundation\NotImplementedError();
+                            throw new \BadMethodCallException('NotImplementedError');
                         }
 
                         $directory = Os::path_normpath($user_config->directory);
@@ -1171,7 +1180,7 @@ final class Base
                                     $passer_result
                                     && $user_config->keep_icloud_recent_days !== null
                                 ) {
-                                    $created_date = Clock::astimezone($item->created(), Clock::get_localzone());
+                                    $created_date = $item->created()->setTimezone(Clock::get_localzone());
                                     // (now - created_date).days: timedelta.days floors
                                     $micros = ($now->getTimestamp() - $created_date->getTimestamp()) * 1_000_000
                                         + ((int) $now->format('u') - (int) $created_date->format('u'));

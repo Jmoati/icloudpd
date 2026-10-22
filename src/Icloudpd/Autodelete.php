@@ -6,6 +6,7 @@ use Foundation\Clock;
 use Foundation\Logging\Logger;
 use Foundation\Os;
 use Foundation\Py;
+use Foundation\StringUtils;
 use PyicloudIpd\AssetVersion;
 use PyicloudIpd\RawPolicy\RawTreatmentPolicy;
 use PyicloudIpd\Services\Photos\PhotoLibrary;
@@ -59,14 +60,11 @@ final class Autodelete
         $recently_deleted = $library_object->recently_deleted();
 
         foreach ($recently_deleted as $media) {
-            try {
-                $created_date = Clock::astimezone($media->created(), Clock::get_localzone());
-            } catch (\ValueError | \Foundation\OSError) {
-                $logger->error("Could not convert media created date to local timezone %s", $media->created());
-                $created_date = $media->created();
-            }
+            // ponytail: no `except (ValueError, OSError)` around the conversion ("Could not convert media
+            // created date to local timezone"), setTimezone() cannot overflow like astimezone()
+            $created_date = $media->created()->setTimezone(Clock::get_localzone());
 
-            if (mb_strtolower($folder_structure) === "none") {
+            if (StringUtils::lower($folder_structure) === "none") {
                 $date_path = "";
             } else {
                 try {
@@ -77,7 +75,7 @@ final class Autodelete
                     // e.g. ValueError: year=5 is before 1900
                     // (https://github.com/icloud-photos-downloader/icloud_photos_downloader/issues/122)
                     // Just use the Unix epoch
-                    $created_date = Clock::fromtimestamp(0);
+                    $created_date = (new \DateTimeImmutable('@0'))->setTimezone(Clock::get_localzone());
                     $date_path = Py::format($folder_structure, $created_date);
                 }
             }
@@ -89,7 +87,7 @@ final class Autodelete
                 $media->versions_with_raw_policy($raw_policy), $_sizes, $media, $lp_filename_generator
             );
             foreach ($versions as $_size => $_version) {
-                if (in_array($_size, [AssetVersionSize::ALTERNATIVE, AssetVersionSize::ADJUSTED])) {
+                if (in_array($_size, [AssetVersionSize::ALTERNATIVE, AssetVersionSize::ADJUSTED], true)) {
                     $version_filename = AssetVersion::calculate_version_filename(
                         $media->filename(),
                         $_version,
@@ -103,7 +101,7 @@ final class Autodelete
                 }
             }
             foreach ($media->versions_with_raw_policy($raw_policy) as $_size => $_version) {
-                if (!in_array($_size, [AssetVersionSize::ALTERNATIVE, AssetVersionSize::ADJUSTED])) {
+                if (!in_array($_size, [AssetVersionSize::ALTERNATIVE, AssetVersionSize::ADJUSTED], true)) {
                     $version_filename = AssetVersion::calculate_version_filename(
                         $media->filename(),
                         $_version,
