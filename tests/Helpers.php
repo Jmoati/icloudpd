@@ -260,6 +260,9 @@ final class Helpers
         Argparse::$stderr = $stderr_capture;
 
         $original_argv = $_SERVER['argv'] ?? null;
+        // --use-os-locale calls setlocale(); Python leaks that to the next test, the strftime tests of a
+        // single PHP process would not survive it
+        $original_locale = setlocale(LC_ALL, '0');
         $input_method = 'Icloudpd\Authentication::input';
         $original_input = Patch::get($input_method);
         $icloudpd_logger = null;
@@ -302,6 +305,9 @@ final class Helpers
             $exit_code = 1;
         } finally {
             $_SERVER['argv'] = $original_argv;
+            if ($original_locale !== false) {
+                setlocale(LC_ALL, $original_locale);
+            }
             if ($original_input) {
                 Patch::set($input_method, $original_input);
             } else {
