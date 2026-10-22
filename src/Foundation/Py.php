@@ -321,14 +321,11 @@ final class Py
     /** `tzname()`: `UTC`, `CEST`, and `UTC+02:00` for a fixed offset as `datetime.timezone` does */
     private static function tz_name(\DateTimeInterface $dt): string
     {
-        $t = $dt->format('T');
-        if ($t === 'Z') {
-            return 'UTC';
-        }
-        if ($t[0] === '+' || $t[0] === '-') {
+        $name = $dt->getTimezone()->getName();
+        if ($name[0] === '+' || $name[0] === '-') { // a fixed offset: PHP's "T" would give GMT+0200
             return $dt->getOffset() === 0 ? 'UTC' : 'UTC'.self::utc_offset($dt, true);
         }
-        return $t;
+        return $dt->format('T');
     }
 
     // ------------------------------------------------------------------ str.format
@@ -506,6 +503,9 @@ final class Py
             throw new \TypeError('unsupported format string passed to '.get_debug_type($v).'.__format__');
         }
         $type ??= is_string($v) ? 's' : ($is_int ? 'd' : '');
+        if ($m[4] !== null && !is_float($v)) {
+            throw new \ValueError('Negative zero coercion (z) not allowed in format specifier');
+        }
         if ($zero !== null && $align === null) {
             $fill = '0';
             $align = '=';
@@ -547,6 +547,9 @@ final class Py
             $body = self::float_body((float) $abs, $type, $prec ?? 6);
         } else {
             throw new \ValueError("Unknown format code '$type' for object of type '".(is_float($v) ? 'float' : 'int')."'");
+        }
+        if ($m[4] !== null && $neg && !preg_match('/[1-9]/', preg_replace('/e.*/i', '', $body))) {
+            $neg = false; // "z": a negative zero that rounds to zero loses its sign
         }
         if ($group !== null && in_array($type, ['d', 'n', 'f', 'F', 'g', 'G', ''], true)) {
             $body = preg_replace_callback('/^\d+/', fn ($d) => strrev(implode($group, str_split(strrev($d[0]), 3))), $body);
@@ -786,7 +789,9 @@ final class Py
         }
         if (is_string($v)) {
             // JsonException on malformed UTF-8: a Python str cannot hold it
-            return json_encode($v, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_LINE_TERMINATORS | ($ascii ? 0 : JSON_UNESCAPED_UNICODE));
+            $s = json_encode($v, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_LINE_TERMINATORS | ($ascii ? 0 : JSON_UNESCAPED_UNICODE));
+            // ensure_ascii also escapes DEL, which json_encode leaves alone
+            return $ascii ? str_replace("\x7f", '\u007f', $s) : $s;
         }
         if ($v instanceof \SplFixedArray) {
             $v = $v->toArray();
