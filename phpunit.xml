@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="tests/bootstrap.php"
+         cacheDirectory=".phpunit.cache"
+         colors="true"
+         failOnWarning="true"
+         displayDetailsOnTestsThatTriggerWarnings="true">
+    <testsuites>
+        <testsuite name="icloudpd">
+            <directory>tests</directory>
+        </testsuite>
+    </testsuites>
+    <php>
+        <env name="TZ" value="Etc/UTC"/>
+        <!-- upstream tests/helpers/__init__.py DEFAULT_ENV -->
+        <env name="CLIENT_ID" value="DE309E26-942E-11E8-92F5-14109FE0B321"/>
+    </php>
+    <source>
+        <include>
+            <directory>src</directory>
+        </include>
+    </source>
+</phpunit>
