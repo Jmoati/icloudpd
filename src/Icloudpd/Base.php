@@ -12,6 +12,7 @@ use Foundation\Http\UnrewindableBodyError;
 use Foundation\Logging;
 use Foundation\Logging\Logger;
 use Foundation\Os;
+use Foundation\OSError;
 use Foundation\Patch;
 use Foundation\Py;
 use Foundation\StringUtils;
@@ -507,7 +508,7 @@ final class Base
         if ($p = Patch::get(__METHOD__)) return $p($args);
         $process = @proc_open($args, [0 => STDIN, 1 => STDOUT, 2 => STDERR], $pipes);
         if ($process === false) {
-            throw new \Foundation\OSError("[Errno 2] No such file or directory: " . Py::repr($args[0]));
+            throw new OSError("[Errno 2] No such file or directory: " . Py::repr($args[0]));
         }
         return proc_close($process);
     }
@@ -636,7 +637,7 @@ final class Base
         if ($p = Patch::get(__METHOD__)) return $p($file, $mode, $encoding);
         $file_obj = @fopen($file, $mode);
         if ($file_obj === false) {
-            throw new \Foundation\OSError("[Errno 2] Cannot open '{$file}'");
+            throw new OSError("[Errno 2] Cannot open '{$file}'");
         }
         return $file_obj;
     }
@@ -679,9 +680,12 @@ final class Base
         Counter $counter,
         PhotoAsset $photo,
     ): bool {
-        // ponytail: no `except (ValueError, OSError)` around the conversion ("Could not convert photo created
-        // date to local timezone"), setTimezone() cannot overflow like astimezone()
-        $created_date = $photo->created()->setTimezone(Clock::get_localzone());
+        try {
+            $created_date = $photo->created()->setTimezone(Clock::get_localzone());
+        } catch (\ValueError | OSError) {
+            $logger->error("Could not convert photo created date to local timezone (%s)", $photo->created());
+            $created_date = $photo->created();
+        }
 
         if (StringUtils::lower($folder_structure) === "none") {
             $date_path = "";

@@ -5,6 +5,7 @@ namespace Icloudpd;
 use Foundation\Clock;
 use Foundation\Logging\Logger;
 use Foundation\Os;
+use Foundation\OSError;
 use Foundation\Py;
 use Foundation\StringUtils;
 use PyicloudIpd\AssetVersion;
@@ -60,9 +61,12 @@ final class Autodelete
         $recently_deleted = $library_object->recently_deleted();
 
         foreach ($recently_deleted as $media) {
-            // ponytail: no `except (ValueError, OSError)` around the conversion ("Could not convert media
-            // created date to local timezone"), setTimezone() cannot overflow like astimezone()
-            $created_date = $media->created()->setTimezone(Clock::get_localzone());
+            try {
+                $created_date = $media->created()->setTimezone(Clock::get_localzone());
+            } catch (\ValueError | OSError) {
+                $logger->error("Could not convert media created date to local timezone %s", $media->created());
+                $created_date = $media->created();
+            }
 
             if (StringUtils::lower($folder_structure) === "none") {
                 $date_path = "";

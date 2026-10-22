@@ -5,6 +5,7 @@ namespace Tests;
 use Foundation\Http\Request;
 use Foundation\Http\Response;
 use Foundation\Http\Session;
+use Foundation\Logging;
 use Foundation\Os;
 
 /**
@@ -34,6 +35,9 @@ class BaseSmokeTest extends TestCase
             ['2018/07/30', 'IMG_7407.JPG', 656257],
         ]);
 
+        // the root logger of a fresh Python process only lets WARNING through (the other tests may have changed it)
+        $root_level = Logging::root()->level;
+        Logging::root()->setLevel(Logging::WARNING);
         $requests = [];
         try {
             $result = Vcr::use_cassette(
@@ -101,6 +105,7 @@ class BaseSmokeTest extends TestCase
             $this->assertSame('2018-07-31 07:22:24', gmdate('Y-m-d H:i:s', filemtime($photo)));
             $this->assertFileDoesNotExist($photo . '.part');
         } finally {
+            Logging::root()->setLevel($root_level);
             Helpers::rmtree($base_dir);
         }
     }

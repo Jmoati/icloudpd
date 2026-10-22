@@ -26,9 +26,15 @@ final class Download
     public static function update_mtime(\DateTimeImmutable $created, string $download_path): void
     {
         if ($created) {
-            // ponytail: no `except (ValueError, OSError)` around the conversion (the "silently return
-            // without touching the mtime" branch), setTimezone() cannot overflow like astimezone()
-            $created_date = $created->setTimezone(Clock::get_localzone());
+            $created_date = null;
+            try {
+                $created_date = $created->setTimezone(Clock::get_localzone());
+            } catch (\ValueError | OSError) {
+                // We already show the timezone conversion error in base.py,
+                // when generating the download directory.
+                // So just return silently without touching the mtime.
+                return;
+            }
             self::set_utime($download_path, $created_date);
         }
     }
