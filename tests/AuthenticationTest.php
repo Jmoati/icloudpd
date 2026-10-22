@@ -42,7 +42,7 @@ class AuthenticationTest extends TestCase
         }
 
         $context = null;
-        Vcr::use_cassette(Helpers::cassette_path(Os::path_join($this->vcr_path, 'failed_auth.yml')), function () use ($cookie_dir, &$context) {
+        Vcr::use_cassette(Os::path_join($this->vcr_path, 'failed_auth.yml'), function () use ($cookie_dir, &$context) {
             try {
                 Authentication::authenticator(
                     Logger::setup_logger(),
@@ -296,7 +296,7 @@ class AuthenticationTest extends TestCase
             Helpers::recreate_path($dir);
         }
 
-        Vcr::use_cassette(Helpers::cassette_path(Os::path_join($this->vcr_path, 'auth_non_2fa.yml')), function ($cass) use ($cookie_dir) {
+        Vcr::use_cassette(Os::path_join($this->vcr_path, 'auth_non_2fa.yml'), function ($cass) use ($cookie_dir) {
             // To re-record this HTTP request,
             // delete ./tests/vcr_cassettes/auth_requires_2fa.yml,
             // put your actual credentials in here, run the test,

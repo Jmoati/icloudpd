@@ -379,4 +379,82 @@ final class Helpers
     {
         return Os::path_join($root_path, 'vcr_cassettes');
     }
+
+    // The tests keep the upstream `.yml` cassette names: `Vcr::use_cassette()` resolves them to the `.json.gz` files.
+
+    public static function run_with_cassette(string $cassette_path, callable $f, mixed $inp): mixed
+    {
+        return Vcr::use_cassette($cassette_path, fn() => $f($inp));
+    }
+
+    /**
+     * @param list<string> $params
+     * @param string|resource|null $input what the user types
+     */
+    public static function run_cassette(string $cassette_path, array $params, mixed $input = null): TestResult
+    {
+        return Vcr::use_cassette(
+            $cassette_path,
+            fn() => self::print_result_exception(self::run_main_env(self::DEFAULT_ENV, $params, $input)),
+        );
+    }
+
+    /**
+     * @param callable(mixed, mixed, string): void $assert_equal
+     * @param list<array{string, string, int}> $files_to_create
+     * @param list<array{string, string}> $files_to_download
+     * @param list<string> $params
+     * @param array<string, string|null> $additional_env
+     * @param string|resource|null $input what the user types
+     * @return array{string, TestResult} [data_dir, result]
+     */
+    public static function run_icloudpd_test(
+        callable $assert_equal,
+        string $root_path,
+        string $base_dir,
+        string $cassette_filename,
+        array $files_to_create,
+        array $files_to_download,
+        array $params,
+        array $additional_env = [],
+        mixed $input = null,
+    ): array {
+        $cookie_dir = self::calc_cookie_dir($base_dir);
+        $data_dir = self::calc_data_dir($base_dir);
+        $vcr_path = self::calc_vcr_dir($root_path);
+        $cookie_master_path = self::calc_cookie_dir($root_path);
+
+        foreach ([$base_dir, $data_dir] as $dir) {
+            self::recreate_path($dir);
+        }
+
+        self::copytree($cookie_master_path, $cookie_dir);
+
+        self::create_files($data_dir, $files_to_create);
+
+        $combined_env = array_merge($additional_env, self::DEFAULT_ENV);
+
+        $main_runner = fn(array $params) => self::print_result_exception(
+            self::run_main_env($combined_env, $params, $input),
+        );
+
+        $with_cassette_main_runner = fn(array $params) => self::run_with_cassette(
+            Os::path_join($vcr_path, $cassette_filename),
+            $main_runner,
+            $params,
+        );
+
+        $combined_params = array_merge([
+            '-d',
+            $data_dir,
+            '--cookie-directory',
+            $cookie_dir,
+        ], $params);
+
+        $result = $with_cassette_main_runner($combined_params);
+        $files_to_assert = self::combine_file_lists($files_to_create, $files_to_download);
+        self::assert_files($assert_equal, $data_dir, $files_to_assert);
+
+        return [$data_dir, $result];
+    }
 }
