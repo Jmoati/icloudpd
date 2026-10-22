@@ -21,6 +21,7 @@
         "ext-json": "*",
         "ext-mbstring": "*",
         "ext-openssl": "*",
+        "ext-xml": "*",
         "ext-zlib": "*",
         "jmoati/image-exiftool": "^13.59"
     },
