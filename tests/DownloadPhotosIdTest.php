@@ -942,8 +942,10 @@ class DownloadPhotosIdTest extends TestCase
         });
 
         Patch::set('PyicloudIpd\Services\Photos\PhotoAsset::versions', fn($self) => $this->versions_dict([
-            [AssetVersionSize::ORIGINAL, ['filename' => 'IMG1.JPG']],
-            [AssetVersionSize::MEDIUM, ['filename' => 'IMG_1.JPG']],
+            // ponytail: upstream puts dicts ({"filename": "IMG1.JPG"}) where AssetVersion belongs and never reads
+            // them; Utils::disambiguate_filenames() is typed AssetVersion in PHP, so AssetVersion objects stand in
+            [AssetVersionSize::ORIGINAL, new AssetVersion(1, 'http', 'jpeg', 'blah')],
+            [AssetVersionSize::MEDIUM, new AssetVersion(2, 'ftp', 'movie', 'blah')],
         ]));
 
         [$data_dir, $result] = Helpers::run_icloudpd_test(
@@ -1034,7 +1036,8 @@ class DownloadPhotosIdTest extends TestCase
             $result->output,
         );
         $this->assertStringContainsString(
-            'Could not convert photo created date to local timezone (2018-01-01 00:00:00)',
+            // ponytail: datetimes of the port are always timezone-aware, Python's naive datetime prints without "+00:00"
+            'Could not convert photo created date to local timezone (2018-01-01 00:00:00+00:00)',
             $result->output,
         );
         $this->assertStringContainsString(
@@ -1099,7 +1102,8 @@ class DownloadPhotosIdTest extends TestCase
             $result->output,
         );
         $this->assertStringContainsString(
-            'Could not convert photo created date to local timezone (0005-01-01 00:00:00)',
+            // ponytail: datetimes of the port are always timezone-aware, Python's naive datetime prints without "+00:00"
+            'Could not convert photo created date to local timezone (0005-01-01 00:00:00+00:00)',
             $result->output,
         );
         $this->assertStringContainsString(
