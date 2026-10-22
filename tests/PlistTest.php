@@ -80,7 +80,7 @@ class PlistTest extends TestCase
     public function test_truncated_binary_plist(): void
     {
         $data = base64_decode(self::binary_plists()['nested'][0]);
-        foreach ([40, 100, strlen($data) - 33] as $n) {
+        foreach ([20, 40, 100, strlen($data) - 40] as $n) {
             // drop bytes in the middle: the trailer stays valid but the offsets lie
             try {
                 Plist::loads(substr($data, 0, $n).substr($data, -32));
