@@ -103,6 +103,78 @@ final class Photos
     }
 
     /**
+     * `base64.b64decode(s)` (`binascii.a2b_base64` in non-strict mode, as of Python 3.13: characters
+     * outside the alphabet and `=` inside the data are skipped, a missing or wrong padding at the end is an
+     * error, whereas PHP's `base64_decode()` accepts it).
+     *
+     * @throws \ValueError (`binascii.Error`)
+     */
+    public static function b64decode(string $s): string
+    {
+        if (preg_match('/[^\x00-\x7f]/', $s)) {
+            throw new \ValueError("string argument should contain only ASCII characters");
+        }
+        static $table = null;
+        $table ??= array_flip(str_split("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"));
+
+        $bin = "";
+        $leftchar = 0;
+        $quad_pos = 0;
+        $pads = 0;
+        for ($i = 0, $n = strlen($s); $i < $n; $i++) {
+            $this_ch = $s[$i];
+
+            // Check for pad sequences and ignore the invalid ones.
+            if ($this_ch === "=") {
+                if ($quad_pos >= 2) {
+                    $pads++;
+                }
+                continue;
+            }
+
+            if (!isset($table[$this_ch])) {
+                continue;
+            }
+            $this_ch = $table[$this_ch];
+            $pads = 0;
+
+            switch ($quad_pos) {
+                case 0:
+                    $quad_pos = 1;
+                    $leftchar = $this_ch;
+                    break;
+                case 1:
+                    $quad_pos = 2;
+                    $bin .= chr((($leftchar << 2) | ($this_ch >> 4)) & 0xff);
+                    $leftchar = $this_ch & 0x0f;
+                    break;
+                case 2:
+                    $quad_pos = 3;
+                    $bin .= chr((($leftchar << 4) | ($this_ch >> 2)) & 0xff);
+                    $leftchar = $this_ch & 0x03;
+                    break;
+                case 3:
+                    $quad_pos = 0;
+                    $bin .= chr((($leftchar << 6) | $this_ch) & 0xff);
+                    $leftchar = 0;
+                    break;
+            }
+        }
+
+        if ($quad_pos == 1) {
+            // There is exactly one extra valid, non-padding, base64 character.
+            throw new \ValueError(sprintf(
+                "Invalid base64-encoded string: number of data characters (%d) cannot be 1 more than a multiple of 4",
+                intdiv(strlen($bin), 3) * 4 + 1
+            ));
+        } elseif ($quad_pos != 0 && $quad_pos + $pads < 4) {
+            throw new \ValueError("Incorrect padding");
+        }
+
+        return $bin;
+    }
+
+    /**
      * `logger = logging.getLogger(__name__)`
      */
     public static function logger()
@@ -124,7 +196,7 @@ final class Photos
     public static function download_asset(Session $session, string $url, int $start = 0): Response
     {
         $headers = ["Range" => "bytes={$start}-"];
-        return $session->get($url, ["headers" => $headers, "stream" => true]);
+        return $session->get($url, headers: $headers, stream: true);
     }
 
     /**

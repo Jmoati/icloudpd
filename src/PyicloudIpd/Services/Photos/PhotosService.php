@@ -81,7 +81,7 @@ class PhotosService extends PhotoLibrary
             $libraries = [];
             $service_endpoint = $this->get_service_endpoint($library_type);
             $url = "{$service_endpoint}/zones/list";
-            $request = $this->session->post($url, ["data" => "{}", "headers" => ["Content-type" => "text/plain"]]);
+            $request = $this->session->post($url, data: "{}", headers: ["Content-type" => "text/plain"]);
             $response = $request->json();
             foreach ($response["zones"] as $zone) {
                 if (empty($zone["deleted"])) {

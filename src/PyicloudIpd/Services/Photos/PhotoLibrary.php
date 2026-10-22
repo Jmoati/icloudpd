@@ -8,6 +8,7 @@ use Foundation\Http\Urllib;
 use Foundation\Patch;
 use Foundation\Py;
 use PyicloudIpd\Exceptions\PyiCloudServiceNotActivatedException;
+use PyicloudIpd\Services\Photos as PhotosModule;
 
 /**
  * Represents a library in the user's photos.
@@ -138,7 +139,7 @@ class PhotoLibrary
             ]
         );
 
-        $request = $this->session->post($url, ["data" => $json_data, "headers" => ["Content-type" => "text/plain"]]);
+        $request = $this->session->post($url, data: $json_data, headers: ["Content-type" => "text/plain"]);
         $response = $request->json();
         $indexing_state = $response["records"][0]["fields"]["state"]["value"];
         if ($indexing_state !== "FINISHED") {
@@ -176,7 +177,7 @@ class PhotoLibrary
             $folder_id = $folder["recordName"];
             $folder_obj_type = "CPLContainerRelationNotDeletedByAssetDate:{$folder_id}";
             $folder_name = Foundation::bytes_decode("utf-8")(
-                Py::b64decode($folder["fields"]["albumNameEnc"]["value"])
+                PhotosModule::b64decode($folder["fields"]["albumNameEnc"]["value"])
             );
             $query_filter = [
                 [
@@ -221,7 +222,7 @@ class PhotoLibrary
             ]
         );
 
-        $request = $this->session->post($url, ["data" => $json_data, "headers" => ["Content-type" => "text/plain"]]);
+        $request = $this->session->post($url, data: $json_data, headers: ["Content-type" => "text/plain"]);
         $response = $request->json();
 
         return $response["records"];

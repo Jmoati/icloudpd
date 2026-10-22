@@ -63,10 +63,8 @@ class PhotoAlbum implements IteratorAggregate, Countable
         $url = "{$this->service_endpoint}/internal/records/query/batch?" . Urllib::urlencode($this->params);
         $request = $this->session->post(
             $url,
-            [
-                "data" => Py::json_dumps($this->_count_query_gen($this->obj_type)),
-                "headers" => ["Content-type" => "text/plain"],
-            ]
+            data: Py::json_dumps($this->_count_query_gen($this->obj_type)),
+            headers: ["Content-type" => "text/plain"],
         );
         $response = $request->json();
 
@@ -83,10 +81,8 @@ class PhotoAlbum implements IteratorAggregate, Countable
         $url = "{$this->service_endpoint}/records/query?" . Urllib::urlencode($this->params);
         return $this->session->post(
             $url,
-            [
-                "data" => Py::json_dumps($this->_list_query_gen($this->offset, $this->list_type, $this->query_filter)),
-                "headers" => ["Content-type" => "text/plain"],
-            ]
+            data: Py::json_dumps($this->_list_query_gen($this->offset, $this->list_type, $this->query_filter)),
+            headers: ["Content-type" => "text/plain"],
         );
     }
 

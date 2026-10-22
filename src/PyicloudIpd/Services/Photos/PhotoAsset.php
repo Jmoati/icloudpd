@@ -153,7 +153,7 @@ class PhotoAsset
 
             $parse_base64_value = Core::compose(
                 Foundation::bytes_decode("utf-8"),
-                Py::b64decode(...),
+                PhotosModule::b64decode(...),
             );
 
             $parser_selector = Core::compose($_match_type(Core::identity(...), $parse_base64_value), $_get_type);
@@ -204,7 +204,7 @@ class PhotoAsset
             return $p($this);
         }
         try {
-            $created_date = Clock::astimezone($this->asset_date(), Clock::get_localzone());
+            $created_date = $this->asset_date()->setTimezone(Clock::get_localzone());
         } catch (\ValueError | OSError) {
             PhotosModule::logger()->error(
                 "Could not convert photo created date to local timezone (%s)",
@@ -223,18 +223,18 @@ class PhotoAsset
             if (!is_int($value) && !is_float($value) && !is_bool($value)) {
                 throw new \TypeError("unsupported operand type(s) for /: '" . get_debug_type($value) . "' and 'float'");
             }
-            $dt = Clock::fromtimestamp($value / 1000.0, new DateTimeZone("UTC"));
+            $dt = self::fromtimestamp($value / 1000.0);
         } catch (\OutOfBoundsException | \TypeError | \ValueError) {
-            $dt = Clock::fromtimestamp(0);
+            // naive `datetime.fromtimestamp(0)` is local time, a `DateTimeImmutable` is always aware (see Foundation\Py)
+            $dt = (new DateTimeImmutable('@0'))->setTimezone(Clock::get_localzone());
         }
         return $dt;
     }
 
     public function added_date(): DateTimeImmutable
     {
-        $dt = Clock::fromtimestamp(
-            self::getitem(self::getitem(self::getitem($this->_asset_record, "fields"), "addedDate"), "value") / 1000.0,
-            new DateTimeZone("UTC")
+        $dt = self::fromtimestamp(
+            self::getitem(self::getitem(self::getitem($this->_asset_record, "fields"), "addedDate"), "value") / 1000.0
         );
         return $dt;
     }
@@ -386,6 +386,29 @@ class PhotoAsset
     public function __repr__(): string
     {
         return "<" . substr(strrchr(static::class, "\\"), 1) . ": id={$this->id()}>";
+    }
+
+    /**
+     * `datetime.fromtimestamp(t, tz=pytz.utc)`: microseconds rounded half to even, year 1 to 9999.
+     *
+     * @throws \ValueError
+     */
+    private static function fromtimestamp(float $t): DateTimeImmutable
+    {
+        $frac = fmod($t, 1.0);
+        $secs = $t - $frac;
+        $us = (int) round($frac * 1e6, 0, PHP_ROUND_HALF_EVEN);
+        if ($us >= 1000000) {
+            $secs += 1;
+            $us -= 1000000;
+        } elseif ($us < 0) {
+            $secs -= 1;
+            $us += 1000000;
+        }
+        if ($secs < -62135596800 || $secs > 253402300799) {
+            throw new \ValueError("year is out of range");
+        }
+        return (new DateTimeImmutable('@' . (int) $secs))->setTimezone(new DateTimeZone("UTC"))->modify("+{$us} usec");
     }
 
     /**
