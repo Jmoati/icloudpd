@@ -1,0 +1,17 @@
+#!/usr/bin/env php
+<?php
+
+// entry point of `src/starters/icloudpd.py` (the `icloudpd` script runs `sys.exit(cli())`)
+
+// tzlocal.get_localzone(): $TZ, else the zone /etc/localtime links to (PHP's default is UTC, see Clock::get_localzone())
+$tz = getenv('TZ') ?: null;
+if ($tz === null && is_link('/etc/localtime') && preg_match('~zoneinfo/(.+)$~', (string) readlink('/etc/localtime'), $m)) {
+    $tz = $m[1];
+}
+if ($tz !== null) {
+    @date_default_timezone_set(ltrim($tz, ':'));
+}
+
+require $GLOBALS['_composer_autoload_path'] ?? __DIR__ . '/../vendor/autoload.php';
+
+exit(\Icloudpd\Cli::cli());
