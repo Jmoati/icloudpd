@@ -7,6 +7,7 @@ use Foundation\Core;
 use Foundation\Http\ChunkedEncodingError;
 use Foundation\Http\ContentDecodingError;
 use Foundation\Http\StreamConsumedError;
+use Foundation\Http\Urllib;
 use Foundation\Http\UnrewindableBodyError;
 use Foundation\Logging;
 use Foundation\Logging\Logger;
@@ -339,7 +340,7 @@ final class Base
         $shared_status_exchange->set_user_configs($user_configs);
 
         foreach ($user_configs as $user_config) {
-            Tqdm::logging_redirect_tqdm(function () use ($global_config, $user_config, $logger, $shared_status_exchange, &$result_) {
+            $result = Tqdm::logging_redirect_tqdm(function () use ($global_config, $user_config, $logger, $shared_status_exchange): ?int {
                 // Use shared status exchange instead of creating new ones per user
                 $status_exchange = $shared_status_exchange;
 
@@ -442,7 +443,7 @@ final class Base
                     $user_config->smtp_no_tls,
                     $user_config->notification_email,
                     $user_config->notification_email_from,
-                    $user_config->notification_script ? (string) $user_config->notification_script : null,
+                    Py::truthy($user_config->notification_script) ? (string) $user_config->notification_script : null,
                 );
 
                 // Use core_single_run since we've disabled watch at this level
@@ -462,7 +463,7 @@ final class Base
                 // If any user config fails and we're not in watch mode, return the error code
                 if ($result != 0) {
                     if (!$global_config->watch_with_interval) {
-                        $result_ = $result;
+                        return $result;
                     } else {
                         // In watch mode, log error and continue with next user
                         $logger->error(
@@ -470,9 +471,10 @@ final class Base
                         );
                     }
                 }
+                return null;
             });
-            if ($result_ !== null) {
-                return $result_;
+            if ($result !== null) {
+                return $result;
             }
         }
 
@@ -894,7 +896,7 @@ final class Base
         $clean_filename_local = $filename_builder($photo);
         $logger->debug("Deleting %s in iCloud...", $clean_filename_local);
         $url = "{$library_object->service_endpoint}/records/modify?"
-            . Py::urlencode($library_object->params);
+            . Urllib::urlencode($library_object->params);
         $post_data = Py::json_dumps(
             [
                 "atomic" => true,
@@ -913,7 +915,7 @@ final class Base
                 "zoneID" => $library_object->zone_id,
             ]
         );
-        $library_object->session->post($url, ["data" => $post_data, "headers" => ["Content-type" => "application/json"]]);
+        $library_object->session->post($url, data: $post_data, headers: ["Content-type" => "application/json"]);
         $logger->info("Deleted %s in iCloud", $clean_filename_local);
     }
 
@@ -1030,7 +1032,7 @@ final class Base
                     return 0;
                 } else {
                     // Access to the selected library. Defaults to the primary photos object.
-                    if ($user_config->library) {
+                    if (Py::truthy($user_config->library)) {
                         if (array_key_exists($user_config->library, $icloud->photos()->private_libraries())) {
                             $library_object = $icloud->photos()->private_libraries()[$user_config->library];
                         } elseif (array_key_exists($user_config->library, $icloud->photos()->shared_libraries())) {
@@ -1049,7 +1051,7 @@ final class Base
                         echo implode("\n", $album_titles) . "\n";
                         return 0;
                     } else {
-                        if (!$user_config->directory) {
+                        if (!Py::truthy($user_config->directory)) {
                             // should be checked upstream
                             throw new \BadMethodCallException('NotImplementedError');
                         }

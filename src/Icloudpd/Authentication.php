@@ -4,6 +4,7 @@ namespace Icloudpd;
 
 use Foundation\Logging\Logger;
 use Foundation\Patch;
+use Foundation\Py;
 use Foundation\StringUtils;
 use Icloudpd\Authentication\SystemExit;
 use Icloudpd\MfaProvider\MFAProvider;
@@ -128,7 +129,7 @@ final class Authentication
             foreach ($password_providers as $_ => $_pair) {
                 [$reader, $_] = $_pair;
                 $password = $reader($username);
-                if ($password) {
+                if (Py::truthy($password)) {
                     $valid_password[] = $password;
                     return $password;
                 }
