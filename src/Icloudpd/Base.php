@@ -649,8 +649,7 @@ final class Base
      */
     public static function json_dump(mixed $obj, $fp): void
     {
-        if ($p = Patch::get(__METHOD__)) { $p($obj, $fp); return; }
-        fwrite($fp, Py::json_dumps($obj));
+        Py::json_dump($obj, $fp);
     }
 
     /**

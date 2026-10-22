@@ -98,6 +98,22 @@ final class Logging
         self::$loggerClass = $class;
     }
 
+    /**
+     * `LOGGER = logging.getLogger(__name__)` at the top of a module: in Python it runs at import time, before
+     * any `setLoggerClass()`, so the logger is a plain `Logger` at NOTSET. PHP has no import time (the modules
+     * are loaded lazily), so a module logger asks for that explicitly.
+     */
+    public static function moduleLogger(string $name): Logger
+    {
+        $class = self::$loggerClass;
+        self::$loggerClass = Logger::class;
+        try {
+            return self::getLogger($name);
+        } finally {
+            self::$loggerClass = $class;
+        }
+    }
+
     /** Return a logger with the specified name, creating it if necessary. `root` (or nothing) is the root logger. */
     public static function getLogger(string $name = 'root'): Logger
     {

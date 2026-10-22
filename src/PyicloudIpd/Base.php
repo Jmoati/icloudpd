@@ -24,7 +24,7 @@ final class Base
     {
         PyicloudIpd::init();
 
-        return Logging::getLogger('pyicloud_ipd.base');
+        return Logging::moduleLogger('pyicloud_ipd.base');
     }
 
     /** @return array{Origin: string, Referer: string} */

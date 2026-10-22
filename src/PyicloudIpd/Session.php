@@ -24,7 +24,7 @@ final class Session
     {
         PyicloudIpd::init();
 
-        return Logging::getLogger('pyicloud_ipd.session');
+        return Logging::moduleLogger('pyicloud_ipd.session');
     }
 
     /**

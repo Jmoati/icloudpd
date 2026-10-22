@@ -19,7 +19,7 @@ final class PyicloudIpd
     {
         if (!self::$initialized) {
             self::$initialized = true;
-            Logging::getLogger('pyicloud_ipd')->addHandler(new NullHandler());
+            Logging::moduleLogger('pyicloud_ipd')->addHandler(new NullHandler());
         }
     }
 }

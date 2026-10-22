@@ -763,6 +763,15 @@ final class Py
         return preg_replace('/e([+-])(\d)$/', 'e${1}0$2', $s);
     }
 
+    // ------------------------------------------------------------------ json.dump
+
+    /** `json.dump(obj, fp)`: patchable, the upstream tests count its calls (session saves included) */
+    public static function json_dump(mixed $obj, $fp): void
+    {
+        if ($p = Patch::get(__METHOD__)) { $p($obj, $fp); return; }
+        fwrite($fp, self::json_dumps($obj));
+    }
+
     // ------------------------------------------------------------------ json.dumps
 
     /**

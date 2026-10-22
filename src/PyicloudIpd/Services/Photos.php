@@ -180,7 +180,7 @@ final class Photos
      */
     public static function logger(): Logger
     {
-        return Logging::getLogger("pyicloud_ipd.services.photos");
+        return Logging::moduleLogger("pyicloud_ipd.services.photos");
     }
 
     /**
