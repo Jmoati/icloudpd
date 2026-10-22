@@ -38,6 +38,12 @@ final class Py
         return (bool) $v;
     }
 
+    /** `operator.not_(v)` */
+    public static function not_(mixed $v): bool
+    {
+        return !self::truthy($v);
+    }
+
     // ------------------------------------------------------------------ str() / repr()
 
     /** `str(v)` */
