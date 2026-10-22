@@ -5,6 +5,7 @@ namespace Tests;
 use Foundation\Argparse;
 use Foundation\Logging;
 use Foundation\Logging\Formatter;
+use Foundation\Logging\NullHandler;
 use Foundation\Logging\StreamHandler;
 use Foundation\Os;
 use Foundation\Patch;
@@ -386,10 +387,35 @@ final class Helpers
         return Os::path_join($root_path, 'vcr_cassettes');
     }
 
+    /**
+     * What pytest does to the logging of the process, which the upstream tests rely on: it keeps its own handlers
+     * on the root logger (so `logging.basicConfig(stream=sys.stdout)` of `create_logger` does nothing, and what
+     * the loggers of `pyicloud_ipd` say never reaches the output of a test), and the `stdoutLogger` that
+     * `setup_logger()` leaves on the `icloudpd` logger writes into the capture of the first test, not into the
+     * following ones. In PHP both would write to `php://output`, the capture of every test: duplicated lines.
+     */
+    public static function pytest_logging(): void
+    {
+        $root = Logging::root();
+        foreach ([...$root->handlers] as $handler) {
+            $root->removeHandler($handler);
+        }
+        $root->addHandler(new NullHandler());
+
+        $icloudpd_logger = Logging::getLogger('icloudpd');
+        foreach ([...$icloudpd_logger->handlers] as $handler) {
+            if ($handler->name === 'stdoutLogger') {
+                $icloudpd_logger->removeHandler($handler);
+            }
+        }
+    }
+
     // The tests keep the upstream `.yml` cassette names: `Vcr::use_cassette()` resolves them to the `.json.gz` files.
 
     public static function run_with_cassette(string $cassette_path, callable $f, mixed $inp): mixed
     {
+        self::pytest_logging();
+
         return Vcr::use_cassette($cassette_path, fn() => $f($inp));
     }
 
@@ -399,6 +425,8 @@ final class Helpers
      */
     public static function run_cassette(string $cassette_path, array $params, mixed $input = null): TestResult
     {
+        self::pytest_logging();
+
         return Vcr::use_cassette(
             $cassette_path,
             fn() => self::print_result_exception(self::run_main_env(self::DEFAULT_ENV, $params, $input)),

@@ -217,7 +217,8 @@ class AuthenticationTest extends TestCase
         $expected = new _TrustedDevice(id: 1, obfuscated_number: '(***) ***-**81');
         $result = Sms::parse_trusted_phone_numbers_payload($html);
         $this->assertSame(1, count($result), 'number of numbers parsed');
-        $this->assertEquals($expected, $result[0], 'parsed number');
+        // NamedTuple equality is tuple equality: the fields, not the class
+        $this->assertEquals(get_object_vars($expected), get_object_vars($result[0]), 'parsed number');
     }
 
     public function test_parse_trusted_phone_numbers_payload_minimal(): void
@@ -226,7 +227,8 @@ class AuthenticationTest extends TestCase
         $expected = new _TrustedDevice(id: 1, obfuscated_number: '(***) ***-**81');
         $result = Sms::parse_trusted_phone_numbers_payload($html);
         $this->assertSame(1, count($result), 'number of numbers parsed');
-        $this->assertEquals($expected, $result[0], 'parsed number');
+        // NamedTuple equality is tuple equality: the fields, not the class
+        $this->assertEquals(get_object_vars($expected), get_object_vars($result[0]), 'parsed number');
     }
 
     public function test_parse_trusted_phone_numbers_payload_bridge_initiate_fallback(): void
@@ -235,7 +237,8 @@ class AuthenticationTest extends TestCase
         $expected = new _TrustedDevice(id: 1, obfuscated_number: '(***) ***-**81');
         $result = Sms::parse_trusted_phone_numbers_payload($html);
         $this->assertSame(1, count($result), 'number of numbers parsed');
-        $this->assertEquals($expected, $result[0], 'parsed number');
+        // NamedTuple equality is tuple equality: the fields, not the class
+        $this->assertEquals(get_object_vars($expected), get_object_vars($result[0]), 'parsed number');
     }
 
     public function test_parse_trusted_phone_numbers_payload_missing_node0(): void

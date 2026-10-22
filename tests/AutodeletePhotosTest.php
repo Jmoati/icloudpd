@@ -362,7 +362,7 @@ class AutodeletePhotosTest extends TestCase
 
     public function test_retry_delete_after_download_session_error(): void
     {
-        if (Constants::MAX_RETRIES === 0) {
+        if (Constants::$MAX_RETRIES === 0) {
             $this->markTestSkipped('Disabled when MAX_RETRIES set to 0');
         }
 
@@ -453,7 +453,7 @@ class AutodeletePhotosTest extends TestCase
         );
 
         $this->assertSame(
-            1 + min(1, Constants::MAX_RETRIES),
+            1 + min(1, Constants::$MAX_RETRIES),
             $pa_delete_call_count,
             'delete call count',
         );
@@ -557,19 +557,19 @@ class AutodeletePhotosTest extends TestCase
 
         // Error msg should be repeated MAX_RETRIES times
         $this->assertSame(
-            max(0, Constants::MAX_RETRIES),
+            max(0, Constants::$MAX_RETRIES),
             substr_count($result->output, 'Session error, re-authenticating...'),
             'retry count',
         );
 
         $this->assertSame(
-            Constants::MAX_RETRIES + 1,
+            Constants::$MAX_RETRIES + 1,
             $pa_delete_call_count,
             'delete call count',
         );
         // Make sure we only call sleep MAX_RETRIES-1 times (skip the first retry)
         $this->assertSame(
-            max(0, Constants::MAX_RETRIES - 1),
+            max(0, Constants::$MAX_RETRIES - 1),
             $sleep_call_count,
             'sleep count',
         );
@@ -590,7 +590,7 @@ class AutodeletePhotosTest extends TestCase
 
     public function test_retry_delete_after_download_internal_error(): void
     {
-        if (Constants::MAX_RETRIES === 0) {
+        if (Constants::$MAX_RETRIES === 0) {
             $this->markTestSkipped('Disabled when MAX_RETRIES set to 0');
         }
 
@@ -657,19 +657,19 @@ class AutodeletePhotosTest extends TestCase
 
         // Error msg should be repeated MAX_RETRIES times
         $this->assertSame(
-            min(1, Constants::MAX_RETRIES),
+            min(1, Constants::$MAX_RETRIES),
             substr_count($result->output, 'Internal Error at Apple, retrying...'),
             'retry count',
         );
 
         $this->assertSame(
-            1 + min(1, Constants::MAX_RETRIES),
+            1 + min(1, Constants::$MAX_RETRIES),
             $pa_delete_call_count,
             'delete count',
         );
         // Make sure we only call sleep 4 times (skip the first retry)
         $this->assertSame(
-            min(1, Constants::MAX_RETRIES),
+            min(1, Constants::$MAX_RETRIES),
             $sleep_call_count,
             'sleep count',
         );
@@ -749,14 +749,14 @@ class AutodeletePhotosTest extends TestCase
 
         // Error msg should be repeated 5 times
         $this->assertSame(
-            Constants::MAX_RETRIES,
+            Constants::$MAX_RETRIES,
             substr_count($result->output, 'Internal Error at Apple, retrying...'),
             'retry count',
         );
 
-        $this->assertSame(Constants::MAX_RETRIES + 1, $pa_delete_call_count, 'delete count');
+        $this->assertSame(Constants::$MAX_RETRIES + 1, $pa_delete_call_count, 'delete count');
         // Make sure we only call sleep N times (skip the first retry)
-        $this->assertSame(Constants::MAX_RETRIES, $sleep_call_count, 'sleep count');
+        $this->assertSame(Constants::$MAX_RETRIES, $sleep_call_count, 'sleep count');
         $this->assertSame(1, $result->exit_code, 'Exit code');
 
         // check files
