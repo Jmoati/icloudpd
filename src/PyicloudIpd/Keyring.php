@@ -17,16 +17,18 @@ final class Keyring
 {
     public static function get_password(string $service_name, string $username): ?string
     {
-        [$status, $out] = self::run(
-            self::macos()
-                ? ['security', 'find-generic-password', '-s', $service_name, '-a', $username, '-w']
-                : ['secret-tool', 'lookup', 'service', $service_name, 'username', $username],
-        );
-        if ($status !== 0) {
-            return null;
-        }
+        if (self::macos()) {
+            // `-g` prints `password: "text"`, or `password: 0xHEX  "text"` when it is not printable ASCII, on stderr
+            [$status, , $err] = self::run(['security', 'find-generic-password', '-s', $service_name, '-a', $username, '-g']);
+            if ($status !== 0 || !preg_match('/^password: (?:0x([0-9A-Fa-f]*)|"(.*)")/m', $err, $m)) {
+                return null;
+            }
 
-        return self::macos() ? preg_replace('/\n$/', '', $out) : $out;
+            return ($m[1] ?? '') !== '' ? hex2bin($m[1]) : ($m[2] ?? '');
+        }
+        [$status, $out] = self::run(['secret-tool', 'lookup', 'service', $service_name, 'username', $username]);
+
+        return $status === 0 ? $out : null;
     }
 
     public static function set_password(string $service_name, string $username, string $password): void

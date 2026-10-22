@@ -17,6 +17,7 @@
     "require": {
         "php": ">=8.5",
         "ext-curl": "*",
+        "ext-dom": "*",
         "ext-gmp": "*",
         "ext-json": "*",
         "ext-mbstring": "*",

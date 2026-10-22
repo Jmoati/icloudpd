@@ -78,9 +78,14 @@ class PyiCloudSession extends Session
         }
 
         // Save session_data to file
-        // an empty dict is `{}`, not `[]`
-        file_put_contents($this->service->session_path(), Py::json_dumps($this->service->session_data ?: new \stdClass()));
-        SessionModule::LOGGER()->debug('Saved session data to file');
+        // (an empty dict is `{}`, not `[]`)
+        $outfile = fopen($this->service->session_path(), 'w');
+        try {
+            Py::json_dump($this->service->session_data ?: new \stdClass(), $outfile);
+            SessionModule::LOGGER()->debug('Saved session data to file');
+        } finally {
+            fclose($outfile);
+        }
 
         // Save cookies to file
         $this->cookies->save(ignore_discard: true, ignore_expires: true);

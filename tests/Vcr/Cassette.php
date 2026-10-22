@@ -75,7 +75,8 @@ final class Cassette
             if (strtolower($name) === 'content-encoding') {
                 continue;
             }
-            foreach ($values as $value) {
+            // the headers of the older cassettes are strings, not lists
+            foreach ((array) $values as $value) {
                 $msg[] = [$name, $value];
             }
         }

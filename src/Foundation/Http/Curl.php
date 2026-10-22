@@ -46,13 +46,19 @@ final class Curl
         $method = $request->method;
         $headers = [];
         $accept_encoding = '';
+        // curl adds `Content-Type: application/x-www-form-urlencoded` to a request with a body, requests does not
+        $content_type = false;
         foreach ($request->headers as $name => $value) {
+            $content_type = $content_type || strtolower($name) === 'content-type';
             if (strtolower($name) === 'accept-encoding') {
                 // curl decodes what it announces
                 $accept_encoding = (string) $value;
                 continue;
             }
             $headers[] = $value === '' ? "$name;" : "$name: $value";
+        }
+        if (!$content_type) {
+            $headers[] = 'Content-Type:';
         }
         $headers[] = 'Expect:';
 

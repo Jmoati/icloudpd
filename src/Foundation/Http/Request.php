@@ -123,7 +123,8 @@ class Request
         // it doesn't start with a wildcard (*), before allowing the unencoded hostname.
         $port = Urllib::port($netloc);
         if (preg_match('/[^\x00-\x7f]/', $host)) {
-            $ascii = idn_to_ascii($host, IDNA_NONTRANSITIONAL_TO_ASCII, INTL_IDNA_VARIANT_UTS46);
+            // ponytail: IDNA needs ext-intl, an iCloud host is ASCII
+            $ascii = function_exists('idn_to_ascii') ? idn_to_ascii($host, IDNA_NONTRANSITIONAL_TO_ASCII, INTL_IDNA_VARIANT_UTS46) : false;
             if ($ascii === false) {
                 throw new InvalidURL('URL has an invalid label.');
             }

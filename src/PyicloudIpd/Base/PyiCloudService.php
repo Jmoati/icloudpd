@@ -317,7 +317,8 @@ class PyiCloudService
             }
         }
 
-        return posix_getpwuid(posix_geteuid())['name'];
+        // pwd.getpwuid(os.getuid())[0]
+        return function_exists('posix_getpwuid') ? posix_getpwuid(posix_geteuid())['name'] : get_current_user();
     }
 
     /**
