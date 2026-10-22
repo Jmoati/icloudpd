@@ -588,7 +588,7 @@ class DownloadPhotosIdTest extends TestCase
         // Error msg should be repeated 5 times
         $this->assertEqual(
             substr_count($result->output, 'Session error, re-authenticating...'),
-            max(1, Constants::MAX_RETRIES),
+            max(1, Constants::$MAX_RETRIES),
             'retry count',
         );
 
@@ -600,7 +600,7 @@ class DownloadPhotosIdTest extends TestCase
         // Make sure we only call sleep 4 times (skip the first retry)
         $this->assertEqual(
             $sleep_count,
-            max(0, Constants::MAX_RETRIES - 1),
+            max(0, Constants::$MAX_RETRIES - 1),
             'sleep count',
         );
         $this->assertSame(0, $result->exit_code);
@@ -661,7 +661,7 @@ class DownloadPhotosIdTest extends TestCase
         // Error msg should be repeated 5 times
         $this->assertEqual(
             substr_count($result->output, 'Session error, re-authenticating...'),
-            max(0, Constants::MAX_RETRIES),
+            max(0, Constants::$MAX_RETRIES),
             'retry count',
         );
 
@@ -672,7 +672,7 @@ class DownloadPhotosIdTest extends TestCase
         // Make sure we only call sleep 4 times (skip the first retry)
         $this->assertEqual(
             $sleep_count,
-            max(0, Constants::MAX_RETRIES - 1),
+            max(0, Constants::$MAX_RETRIES - 1),
             'sleep count',
         );
 
@@ -1795,7 +1795,7 @@ class DownloadPhotosIdTest extends TestCase
         // Error msg should be repeated 5 times
         $this->assertEqual(
             substr_count($result->output, 'Error downloading'),
-            Constants::MAX_RETRIES,
+            Constants::$MAX_RETRIES,
             'retry count',
         );
 
@@ -1805,7 +1805,7 @@ class DownloadPhotosIdTest extends TestCase
         );
 
         // Make sure we only call sleep 4 times (skip the first retry)
-        $this->assertEqual($sleep_count, Constants::MAX_RETRIES, 'sleep count');
+        $this->assertEqual($sleep_count, Constants::$MAX_RETRIES, 'sleep count');
         $this->assertEqual($result->exit_code, 0, 'Exit Code');
     }
 
@@ -1851,7 +1851,7 @@ class DownloadPhotosIdTest extends TestCase
         // Error msg should be repeated 5 times
         $this->assertEqual(
             substr_count($result->output, 'Internal Error at Apple, retrying...'),
-            Constants::MAX_RETRIES,
+            Constants::$MAX_RETRIES,
             'retry count',
         );
 
@@ -1861,7 +1861,7 @@ class DownloadPhotosIdTest extends TestCase
         );
 
         // Make sure we only call sleep 4 times (skip the first retry)
-        $this->assertEqual($sleep_count, Constants::MAX_RETRIES, 'sleep count');
+        $this->assertEqual($sleep_count, Constants::$MAX_RETRIES, 'sleep count');
 
         $this->assertEqual($result->exit_code, 1, 'Exit Code');
     }
