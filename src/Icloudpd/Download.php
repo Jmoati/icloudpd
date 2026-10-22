@@ -236,7 +236,7 @@ final class Download
                     $icloud->authenticate();
                 } else {
                     // short circuiting 0 retries
-                    if ($retries == Constants::MAX_RETRIES) {
+                    if ($retries == Constants::$MAX_RETRIES) {
                         break;
                     }
                     // you end up here when p.e. throttling by Apple happens
@@ -260,11 +260,11 @@ final class Download
                 break;
             }
             $retries = $retries + 1;
-            if ($retries >= Constants::MAX_RETRIES) {
+            if ($retries >= Constants::$MAX_RETRIES) {
                 break;
             }
         }
-        if ($retries >= Constants::MAX_RETRIES) {
+        if ($retries >= Constants::$MAX_RETRIES) {
             // Get the proper filename for error messages
             $error_filename = $filename_builder($photo);
             $logger->error(
