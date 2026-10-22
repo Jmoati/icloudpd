@@ -3,3 +3,4 @@
 /var/
 /.idea/
 /.phpunit.cache/
+/tests/fixtures/

@@ -33,6 +33,11 @@ def body(value):
     return {"string": value}
 
 
+def headers(value):
+    """vcrpy records most header values as lists, but a few as bare strings: always lists here."""
+    return {k: v if isinstance(v, list) else [v] for k, v in (value or {}).items()}
+
+
 for name in sorted(os.listdir(src)):
     if not name.endswith(".yml"):
         continue
@@ -46,12 +51,12 @@ for name in sorted(os.listdir(src)):
                 "request": {
                     "method": req["method"],
                     "uri": req["uri"],
-                    "headers": req.get("headers", {}),
+                    "headers": headers(req.get("headers")),
                     "body": body(req.get("body")),
                 },
                 "response": {
                     "status": res["status"],
-                    "headers": res.get("headers", {}),
+                    "headers": headers(res.get("headers")),
                     "body": body(res.get("body")),
                 },
             }
