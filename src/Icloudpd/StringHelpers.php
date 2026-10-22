@@ -32,7 +32,7 @@ final class StringHelpers
      */
     public static function parse_timedelta(string $formatted): ?\DateInterval
     {
-        // re.match: anchored at the start only
+        // re.match: anchored at the start only (ponytail: ASCII digits, Python's \d takes any Unicode digit)
         if (preg_match('/^([0-9]+)([dD]{1})/', $formatted, $m)) {
             return new \DateInterval('P' . $m[1] . 'D');
         }
@@ -46,7 +46,7 @@ final class StringHelpers
      *
      * `datetime.fromisoformat` of Python 3.13 (`_pydatetime.py`), a timestamp without a time zone being
      * in the local one (PHP has no naive datetime, see PORTING.md).
-     * ponytail: no ISO week dates (2025-W01-1), no time zone offsets with seconds.
+     * ponytail: no ISO week dates (2025-W01-1), no microseconds in time zone offsets.
      */
     public static function parse_timestamp(string $formatted): ?\DateTimeImmutable
     {
@@ -97,6 +97,9 @@ final class StringHelpers
 
         if ($tstr !== '') {
             [$hour, $minute, $second, $microsecond, $tzi] = self::_parse_isoformat_time($tstr);
+        } elseif (strlen($date_string) > $separator_location) {
+            // the C implementation does not take a separator that nothing follows
+            throw new \ValueError("Invalid isoformat string: '{$date_string}'");
         } else {
             [$hour, $minute, $second, $microsecond, $tzi] = [0, 0, 0, 0, null];
         }
@@ -178,7 +181,7 @@ final class StringHelpers
      *
      * @return array{int, int, int, int}
      */
-    private static function _parse_hh_mm_ss_ff(string $tstr): array
+    private static function _parse_hh_mm_ss_ff(string $tstr, bool $allow_empty_fraction = false): array
     {
         $len_str = strlen($tstr);
 
@@ -199,7 +202,8 @@ final class StringHelpers
                 $has_sep = $next_char === ':';
             }
 
-            if ($next_char === '' || $comp >= 2) {
+            // ponytail: as the C implementation, the fraction may follow the hours or the minutes
+            if ($next_char === '' || $comp >= 2 || $next_char === '.' || $next_char === ',') {
                 break;
             }
 
@@ -227,8 +231,9 @@ final class StringHelpers
                     $to_parse = $len_remainder;
                 }
 
-                $time_comps[3] = self::_int(substr($tstr, $pos, $to_parse));
-                if ($to_parse < 6) {
+                // ponytail: as the C implementation, "05." is a time when a time zone follows it ("05.Z")
+                $time_comps[3] = $to_parse === 0 && $allow_empty_fraction ? 0 : self::_int(substr($tstr, $pos, $to_parse));
+                if ($to_parse < 6 && $to_parse > 0) {
                     $time_comps[3] *= self::_FRACTION_CORRECTION[$to_parse - 1];
                 }
             }
@@ -260,7 +265,7 @@ final class StringHelpers
                 : (strpos($tstr, 'Z') !== false ? strpos($tstr, 'Z') + 1 : 0)));
         $timestr = $tz_pos > 0 ? substr($tstr, 0, $tz_pos - 1) : $tstr;
 
-        $time_comps = self::_parse_hh_mm_ss_ff($timestr);
+        $time_comps = self::_parse_hh_mm_ss_ff($timestr, $tz_pos > 0);
 
         $tzi = null;
         if ($tz_pos == $len_str && $tstr[-1] === 'Z') {
@@ -294,8 +299,14 @@ final class StringHelpers
                     throw new \ValueError('offset must be a timedelta strictly between -timedelta(hours=24) and timedelta(hours=24)');
                 }
                 $seconds *= $tzsign;
-                // ponytail: the offset is kept to the minute
-                $tzi = new \DateTimeZone(sprintf('%s%02d:%02d', $seconds < 0 ? '-' : '+', intdiv(abs($seconds), 3600), intdiv(abs($seconds) % 3600, 60)));
+                // ponytail: the microseconds of the offset are dropped
+                $tzi = new \DateTimeZone(sprintf(
+                    '%s%02d:%02d:%02d',
+                    $seconds < 0 ? '-' : '+',
+                    intdiv(abs($seconds), 3600),
+                    intdiv(abs($seconds) % 3600, 60),
+                    abs($seconds) % 60,
+                ));
             }
         }
 

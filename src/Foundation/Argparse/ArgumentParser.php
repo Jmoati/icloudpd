@@ -804,9 +804,9 @@ class ArgumentParser extends _ActionsContainer
     public function _print_message(string $message, $file = null): void
     {
         if ($message !== '') {
-            // ponytail: sys.stdout is Py::stdout() (php://output, captured by ob_start() like
-            // redirect_stdout() in the upstream tests); STDERR cannot be captured in process
-            $file = $file ?: STDERR;
+            // sys.stdout is Py::stdout() (php://output, captured by ob_start() like
+            // redirect_stdout() in the upstream tests), sys.stderr is Argparse::stderr()
+            $file = $file ?: Argparse::stderr();
             @fwrite($file, $message);
         }
     }
@@ -818,7 +818,7 @@ class ArgumentParser extends _ActionsContainer
     public function exit(int $status = 0, ?string $message = null): never
     {
         if ($message !== null && $message !== '') {
-            $this->_print_message($message, STDERR);
+            $this->_print_message($message, Argparse::stderr());
         }
         exit($status);
     }
@@ -831,12 +831,12 @@ class ArgumentParser extends _ActionsContainer
      */
     public function error(string $message): never
     {
-        $this->print_usage(STDERR);
+        $this->print_usage(Argparse::stderr());
         $this->exit(2, "{$this->prog}: error: {$message}\n");
     }
 
     public function _warning(string $message): void
     {
-        $this->_print_message("{$this->prog}: warning: {$message}\n", STDERR);
+        $this->_print_message("{$this->prog}: warning: {$message}\n", Argparse::stderr());
     }
 }

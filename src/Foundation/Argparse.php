@@ -38,6 +38,20 @@ final class Argparse
         'help' => Argparse\_HelpAction::class,
     ];
 
+    /**
+     * `sys.stderr` for the messages of argparse (usage, errors, warnings): STDERR unless a test swaps it
+     * for a stream of its own, as `redirect_stderr` does upstream.
+     *
+     * @var resource|null
+     */
+    public static $stderr = null;
+
+    /** @return resource */
+    public static function stderr()
+    {
+        return self::$stderr ?? STDERR;
+    }
+
     public static function _get_action_name(?Action $argument): ?string
     {
         if ($argument === null) {
