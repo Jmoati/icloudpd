@@ -5,9 +5,11 @@ namespace Tests;
 use DateTimeImmutable;
 use DateTimeZone;
 use Foundation\Http\Response;
+use Foundation\OSError;
 use Foundation\Os;
 use Foundation\Patch;
 use Icloudpd\Constants;
+use Icloudpd\ExifDatetime\InvalidImageDataError;
 use Icloudpd\StringHelpers;
 use PyicloudIpd\AssetVersion\AssetVersion;
 use PyicloudIpd\Base\PyiCloudService;
@@ -107,13 +109,17 @@ class DownloadPhotosIdTest extends TestCase
     /** `mock.MagicMock()` as a download response: truthy, `.ok` truthy, `iter_content()` yields nothing */
     private function magic_response(): Response
     {
-        return new Response();
+        return new Response(200, [], '');
     }
 
-    /** `{AssetVersionSize.ORIGINAL: ..., ...}` (a dict keyed by enum members) */
-    private function versions_dict(array $pairs): array
+    /** `{AssetVersionSize.ORIGINAL: ..., ...}`: a dict keyed by enum members is a `WeakMap` in the port */
+    private function versions_dict(array $pairs): \WeakMap
     {
-        return $pairs;
+        $versions = new \WeakMap();
+        foreach ($pairs as [$size, $version]) {
+            $versions[$size] = $version;
+        }
+        return $versions;
     }
 
     /** `result.output.splitlines()` */
@@ -282,14 +288,9 @@ class DownloadPhotosIdTest extends TestCase
 
         $files_to_download = [['2018/07/31', 'IMG_7409_QVk2Yyt.JPG']];
 
-        // mock.patch.object(piexif, "load") with side_effect InvalidImageDataError: get_photo_exif and
-        // set_photo_exif both fail on load and log their error (ponytail: there is no piexif.load seam in PHP)
-        Patch::set('Icloudpd\ExifDatetime::get_photo_exif', function ($logger, $path) {
-            $logger->debug('Error fetching EXIF data for %s', $path);
-            return null;
-        });
-        Patch::set('Icloudpd\ExifDatetime::set_photo_exif', function ($logger, $path, $date) {
-            $logger->debug('Error setting EXIF data for %s', $path);
+        // mock.patch.object(piexif, "load") with side_effect InvalidImageDataError
+        Patch::set('Icloudpd\ExifDatetime::piexif_load', function (...$_args): never {
+            throw new InvalidImageDataError();
         });
 
         [$data_dir, $result] = Helpers::run_icloudpd_test(
@@ -492,7 +493,7 @@ class DownloadPhotosIdTest extends TestCase
 
         // Raise IOError when we try to write to the destination file
         Patch::set('Icloudpd\Download::open', function (...$args) {
-            throw new \Foundation\Py\OSError();
+            throw new OSError();
         });
 
         [$data_dir, $result] = Helpers::run_icloudpd_test(
@@ -737,12 +738,10 @@ class DownloadPhotosIdTest extends TestCase
     {
         $base_dir = $this->path_join($this->fixtures_path, __FUNCTION__);
 
-        // mock.patch.object(Response, "ok") returning False, and PhotoAsset.download returning Response()
-        Patch::set('PyicloudIpd\Services\Photos\PhotoAsset::download', function ($self, ...$args) {
-            $response = new Response();
-            $response->ok = false;
-            return $response;
-        });
+        // `mock.patch.object(Response, "ok")` with `__get__` returning False, and `download` returning a bare
+        // `Response()`: the response the download gets is not ok.
+        // ponytail: only the response returned by `download` is not ok here, Response::ok stays real elsewhere
+        Patch::set('PyicloudIpd\Services\Photos\PhotoAsset::download', fn(...$_args) => new Response(404, [], ''));
 
         [$data_dir, $result] = Helpers::run_icloudpd_test(
             $this->assertEqual(...),
@@ -996,7 +995,7 @@ class DownloadPhotosIdTest extends TestCase
 
         // Can't mock `astimezone` because it's a readonly property, so have to
         // create a new class that inherits from datetime.datetime
-        $NewDateTime = new class('2018-01-01 00:00:00') extends DateTimeImmutable {
+        $NewDateTime = new class('2018-01-01 00:00:00', new DateTimeZone('UTC')) extends DateTimeImmutable {
             public function setTimezone(DateTimeZone $timezone): static
             {
                 throw new \ValueError('Invalid date');
@@ -1061,7 +1060,7 @@ class DownloadPhotosIdTest extends TestCase
 
         // Can't mock `astimezone` because it's a readonly property, so have to
         // create a new class that inherits from datetime.datetime
-        $NewDateTime = new class('0005-01-01 00:00:00') extends DateTimeImmutable {
+        $NewDateTime = new class('0005-01-01 00:00:00', new DateTimeZone('UTC')) extends DateTimeImmutable {
             public function setTimezone(DateTimeZone $timezone): static
             {
                 throw new \ValueError('Invalid date');
@@ -1306,10 +1305,9 @@ class DownloadPhotosIdTest extends TestCase
 
         $files_to_download = [['2018/07/31', 'IMG_7409_QVk2Yyt.JPG']];
 
-        // mock.patch.object(piexif, "insert") with side_effect InvalidImageDataError: set_photo_exif
-        // fails and logs its error (ponytail: there is no piexif.insert seam in PHP)
-        Patch::set('Icloudpd\ExifDatetime::set_photo_exif', function ($logger, $path, $date) {
-            $logger->debug('Error setting EXIF data for %s', $path);
+        // mock.patch.object(piexif, "insert") with side_effect InvalidImageDataError
+        Patch::set('Icloudpd\ExifDatetime::piexif_insert', function (...$_args): never {
+            throw new InvalidImageDataError();
         });
         Patch::set('Icloudpd\ExifDatetime::get_photo_exif', fn($logger, $path) => false);
         [$data_dir, $result] = Helpers::run_icloudpd_test(
@@ -1528,8 +1526,8 @@ class DownloadPhotosIdTest extends TestCase
         $files_to_download = [['2018/07/31', 'IMG_7409_QVk2Yyt.JPG']];
 
         // mock.patch.object(piexif, "insert") with side_effect InvalidImageDataError
-        Patch::set('Icloudpd\ExifDatetime::set_photo_exif', function ($logger, $path, $date) {
-            $logger->debug('Error setting EXIF data for %s', $path);
+        Patch::set('Icloudpd\ExifDatetime::piexif_insert', function (...$_args): never {
+            throw new InvalidImageDataError();
         });
         Patch::set('Icloudpd\ExifDatetime::get_photo_exif', fn($logger, $path) => false);
         [$data_dir, $result] = Helpers::run_icloudpd_test(
@@ -1573,8 +1571,8 @@ class DownloadPhotosIdTest extends TestCase
         $files_to_create = [['2018/07/31', 'IMG_7409_QVk2Yyt.JPG', 1884695]];
 
         // mock.patch.object(piexif, "insert") with side_effect InvalidImageDataError
-        Patch::set('Icloudpd\ExifDatetime::set_photo_exif', function ($logger, $path, $date) {
-            $logger->debug('Error setting EXIF data for %s', $path);
+        Patch::set('Icloudpd\ExifDatetime::piexif_insert', function (...$_args): never {
+            throw new InvalidImageDataError();
         });
         Patch::set('Icloudpd\ExifDatetime::get_photo_exif', fn($logger, $path) => false);
         [$data_dir, $result] = Helpers::run_icloudpd_test(
@@ -1873,11 +1871,11 @@ class DownloadPhotosIdTest extends TestCase
         $base_dir = $this->path_join($this->fixtures_path, __FUNCTION__);
         $method = 'Foundation\Os::makedirs';
         // Raise IOError when we try to write to the destination file
-        $my_makedirs = function (string $name, int $mode = 0777, bool $exist_ok = false) use ($method, $base_dir) {
+        $my_makedirs = function (string $name, bool $exist_ok = false, int $mode = 0777) use ($method, $base_dir) {
             if (strcmp($name, Helpers::calc_data_dir($base_dir)) > 0) {
-                throw new \Foundation\Py\OSError();
+                throw new OSError();
             }
-            $this->unpatched($method, fn() => Os::makedirs($name, $mode, $exist_ok));
+            $this->unpatched($method, fn() => Os::makedirs($name, $exist_ok, $mode));
         };
         Patch::set($method, $my_makedirs);
         [, $result] = Helpers::run_icloudpd_test(
@@ -1959,8 +1957,8 @@ class DownloadPhotosIdTest extends TestCase
         };
 
         // mock.patch.object(piexif, "insert") with side_effect InvalidImageDataError
-        Patch::set('Icloudpd\ExifDatetime::set_photo_exif', function ($logger, $path, $date) {
-            $logger->debug('Error setting EXIF data for %s', $path);
+        Patch::set('Icloudpd\ExifDatetime::piexif_insert', function (...$_args): never {
+            throw new InvalidImageDataError();
         });
         Patch::set('Icloudpd\ExifDatetime::get_photo_exif', fn($logger, $path) => false);
         Patch::set('Icloudpd\Base::delete_photo', $raise_response_error);
