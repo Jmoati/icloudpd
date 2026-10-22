@@ -48,9 +48,28 @@ final class Helpers
         return $rel ? implode('/', $rel) : '.';
     }
 
+    /** @var resource|null */
+    private static $fixtures_lock = null;
+
+    /**
+     * ponytail: the fixtures of the tests (`tests/fixtures/<test name>`) are shared by every PHPUnit process of the
+     * checkout, and several of them may run at once (agents, terminals): two processes preparing the same directory
+     * delete each other's files (`scandir`, `rmdir`, `mkdir(): File exists` warnings, failing tests). The first test
+     * that prepares a directory takes a lock that is held until the process exits, so that the processes queue up.
+     * pytest has no such problem: xdist workers run distinct tests. Upgrade: a fixtures directory per process.
+     */
+    private static function lock_fixtures(): void
+    {
+        if (self::$fixtures_lock === null) {
+            self::$fixtures_lock = fopen(sys_get_temp_dir().'/icloudpd-tests-'.md5(Os::getcwd()).'.lock', 'c');
+            flock(self::$fixtures_lock, LOCK_EX);
+        }
+    }
+
     /** Removes if exists and creates dir */
     public static function recreate_path(string $path_name): void
     {
+        self::lock_fixtures();
         if (file_exists($path_name)) {
             self::rmtree($path_name);
         }
