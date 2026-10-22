@@ -1137,8 +1137,9 @@ class DownloadPhotosTest extends TestCase
             "Downloading the first original photo or video to {$data_dir} ...",
             $result->output,
         );
+        // ponytail: a PHP datetime is always aware (no naive datetime in the port), so str() ends with the offset
         $this->assertStringContainsString(
-            'Could not convert photo created date to local timezone (2018-01-01 00:00:00)',
+            'Could not convert photo created date to local timezone (2018-01-01 00:00:00+00:00)',
             $result->output,
         );
         $this->assertStringContainsString(
