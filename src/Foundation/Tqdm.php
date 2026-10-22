@@ -167,6 +167,7 @@ final class Tqdm implements \IteratorAggregate, \Stringable
     {
         if (!$this->disable) {
             $this->display('');
+            fwrite($this->fp, "\r"); // place cursor back at the beginning of line
         }
     }
 
@@ -258,9 +259,9 @@ final class Tqdm implements \IteratorAggregate, \Stringable
             if ($ncols === 0) {
                 return substr($l_bar, 0, -1).substr($r_bar, 1);
             }
-            $bar_len = $ncols ? max(1, $ncols - mb_strlen($l_bar.$r_bar)) : 10;
+            $bar_len = $ncols ? max(1, $ncols - mb_strwidth($l_bar.$r_bar)) : 10;
             $res = $l_bar.self::bar($frac, $bar_len, $ascii === true ? self::ASCII : ($ascii ?: self::UTF)).$r_bar;
-            return $ncols ? mb_substr($res, 0, $ncols) : $res;
+            return $ncols ? mb_strimwidth($res, 0, $ncols) : $res; // disp_trim: wide characters take two columns
         }
         // no total: no progressbar, ETA, just progress stats
         return ($prefix !== '' ? $prefix.': ' : '')."$n_fmt$unit [$elapsed_str, $rate_fmt]";
