@@ -85,6 +85,7 @@ class CliTest extends TestCase
         $this->assertStringContainsString('--size', $result);
         $this->assertStringContainsString('--live-photo-size', $result);
         $this->assertStringContainsString('--auth-only', $result);
+        $this->assertStringContainsString('--adp-web-access', $result);
         $this->assertStringContainsString('--dry-run', $result);
 
         // Test that option descriptions are present
@@ -211,6 +212,7 @@ class CliTest extends TestCase
                     directory: 'abc',
                     username: 'u1',
                     auth_only: false,
+                    adp_web_access: false,
                     cookie_directory: '~/.pyicloud',
                     password: null,
                     sizes: [AssetVersionSize::ORIGINAL],
@@ -251,6 +253,7 @@ class CliTest extends TestCase
                     directory: 'def',
                     username: 'u2',
                     auth_only: false,
+                    adp_web_access: false,
                     cookie_directory: '~/.pyicloud',
                     password: null,
                     sizes: [AssetVersionSize::ORIGINAL],
@@ -314,6 +317,7 @@ class CliTest extends TestCase
                     directory: 'abc',
                     username: 'u1',
                     auth_only: false,
+                    adp_web_access: false,
                     cookie_directory: '~/.pyicloud',
                     password: null,
                     sizes: [AssetVersionSize::ORIGINAL],

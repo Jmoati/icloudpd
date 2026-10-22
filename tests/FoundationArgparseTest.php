@@ -148,11 +148,11 @@ class FoundationArgparseTest extends TestCase
     public function test_cli_help_like_python(): void
     {
         $md5 = [
-        30 => '60a508c73ff7ac468bd68fced66c8c0e',
-        40 => '231868aff1b0b57be332371441979529',
-        80 => 'a72ed8e837c8ed185bfab722a919854e',
-        120 => '5e8757a7d7f2025cd1add2f86b603add',
-        200 => 'ebe9e1b2ce586c0912b28ba7884962be',
+        30 => '5d6a1cf7dbd2ead5535a603030b3a3f4',
+        40 => '51969128245c2e5e4be6f9c871bcd4be',
+        80 => '82adb10f1242982dd1dbcd94b1168820',
+        120 => '4707568b6121a84a5b8f9b2d081c2949',
+        200 => '829039f454515920e8c632f41b5bc5e7',
         ];
         foreach ($md5 as $columns => $expected) {
             putenv("COLUMNS={$columns}");

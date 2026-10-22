@@ -2,7 +2,8 @@
 
 This repository is a **faithful, file-for-file port** of icloud_photos_downloader 1.32.3
 (`~/icloud_photos_downloader`, git clone of github.com/icloud-photos-downloader/icloud_photos_downloader,
-tag `v1.32.3`). It is not a rewrite: keep the upstream structure, function names, argument order,
+tag `v1.32.3`) plus upstream PR #1392 (`--adp-web-access`, not merged upstream as of 2026-10-22; the diff is
+the branch `pr-1392` of the clone, based exactly on `v1.32.3`). It is not a rewrite: keep the upstream structure, function names, argument order,
 variable names, docstrings, comments and control flow, so that upstream releases can be diffed and
 re-applied. Same rules as the ExifTool port in `~/Sites/image-exiftool/PORTING.md`.
 
@@ -65,7 +66,7 @@ Dataclasses become `final class` with public typed properties and a constructor 
 | `smtplib` | `Foundation\Smtp` (minimal client: `ehlo`, `starttls`, `login`, `sendmail`, `quit`) |
 | `keyring` | `PyicloudIpd\Keyring`: `security` on macOS, `secret-tool` on Linux, otherwise "not available" (`ponytail:` shortcut) |
 | `threading.Lock`, `multiprocessing` | nothing (single thread): `Counter` is a plain int, `StatusExchange` has no lock |
-| `time.sleep`, `os.utime`, `datetime.now()` | `Foundation\Time::sleep()`, `Foundation\Os::utime()`, `Foundation\Clock::now()` — patchable (see below) |
+| `time.sleep`, `time.monotonic`, `os.utime`, `datetime.now()` | `Foundation\Time::sleep()`, `Foundation\Time::monotonic()`, `Foundation\Os::utime()`, `Foundation\Clock::now()` — patchable (see below) |
 
 Type hints: use PHP types on parameters and return values (`string`, `int`, `?array`, `callable`,
 class names) as the Python annotations say; `Any` → `mixed`. No `declare(strict_types=1)`.
@@ -88,6 +89,8 @@ For an instance method, the closure receives `$this` first, then the arguments. 
 with `Patch::set('Icloudpd\Download::download_media', fn(...) => ...)`; `Tests\TestCase::tearDown()`
 clears them. Builtins that tests patch get a thin static wrapper (`Foundation\Time::sleep`,
 `Foundation\Os::utime`, `Foundation\Clock::now`, `Icloudpd\ExifDatetime::...`) with the same guard.
+A class that a test patches (`mock.patch("icloudpd.authentication.PyiCloudService")`) is instantiated through a
+patchable static factory named after it (`Authentication::PyiCloudService(...$args)`, like `Smtp::SMTP`).
 Nothing else is made patchable.
 
 ## HTTP replay (the `vcr` of the upstream tests)

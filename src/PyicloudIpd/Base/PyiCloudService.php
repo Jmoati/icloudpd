@@ -12,6 +12,7 @@ use Foundation\Os;
 use Foundation\Patch;
 use Foundation\Py;
 use Foundation\String_;
+use Foundation\Time;
 use PyicloudIpd\Base;
 use PyicloudIpd\Exceptions\PyiCloudAPIResponseException;
 use PyicloudIpd\Exceptions\PyiCloudConnectionException;
@@ -923,6 +924,74 @@ class PyiCloudService
 
             return false;
         }
+    }
+
+    /**
+     * Replay the icloud.com sequence that unlocks PCS protected data (Advanced Data Protection).
+     *
+     * Needs "Access iCloud Data on the Web" enabled on the account. The first call sends a
+     * notification to the user's Apple devices that must be approved; once consented, later
+     * calls skip straight to requestPCS.
+     */
+    public function request_pcs_consent(string $app_name = 'photos', int $timeout_seconds = 120): void
+    {
+        $workflow = ['workflowUuid' => strtoupper(Base::uuid4())];
+        $params = [...$this->params, 'clientId' => $this->client_id];
+
+        $call = function (string $method, string $name, ?array $body = null) use ($params): array {
+            $response = $this->session->request(
+                $method,
+                "$this->SETUP_ENDPOINT/$name",
+                ...[
+                    'params' => $params,
+                    'headers' => ['Content-Type' => 'text/plain;charset=UTF-8'],
+                    ...($body !== null ? ['data' => Py::json_dumps($body)] : []),
+                ],
+            );
+
+            return $response->json();
+        };
+
+        $state = $call('POST', 'requestWebAccessState', $workflow);
+        if (!Py::truthy($state['isWebAccessAllowed'] ?? null)) {
+            throw new PyiCloudFailedLoginException(
+                'Web access to iCloud data is disabled: '
+                ."enable 'Access iCloud Data on the Web' on your Apple device",
+            );
+        }
+        if (!Py::truthy($state['isDeviceConsentedForPCS'] ?? null)) {
+            $call('POST', 'enableDeviceConsentForPCS', $workflow);
+            Base::LOGGER()->info(
+                'Approve the iCloud web access request on your Apple device (waiting %ss)',
+                $timeout_seconds,
+            );
+            $deadline = Time::monotonic() + $timeout_seconds;
+            while (!Py::truthy($state['isDeviceConsentedForPCS'] ?? null)) {
+                if (Time::monotonic() > $deadline) {
+                    throw new PyiCloudFailedLoginException(
+                        'Timed out waiting for the iCloud web access approval',
+                    );
+                }
+                Time::sleep(3);
+                $state = $call('POST', 'requestWebAccessState', $workflow);
+            }
+        }
+        $call('GET', 'generateSessionIdToken');
+
+        $pcs = ['appName' => $app_name, 'isFinalAttempt' => false, ...$workflow];
+        $result = $call('POST', 'requestPCS', ['derivedFromUserAction' => true, ...$pcs]);
+        for ($_ = 0; $_ < 10; $_++) {
+            if (($result['status'] ?? null) === 'success') {
+                break;
+            }
+            Time::sleep(3);
+            $result = $call('POST', 'requestPCS', ['derivedFromUserAction' => false, ...$pcs]);
+        }
+        Base::LOGGER()->debug(
+            'requestPCS: status=%s message=%s',
+            $result['status'] ?? null,
+            $result['message'] ?? null,
+        );
     }
 
     /** Get webservice URL, throw an exception if not exists. */

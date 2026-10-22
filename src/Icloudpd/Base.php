@@ -1053,6 +1053,7 @@ final class Base
                     $append_response,
                     $user_config->cookie_directory,
                     Os::environ_get("CLIENT_ID"),
+                    $user_config->adp_web_access,
                 );
 
                 // dump captured responses for debugging

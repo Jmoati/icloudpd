@@ -25,6 +25,7 @@ final class UserConfig
     public function __construct(
         public ?string $directory,
         public bool $auth_only,
+        public bool $adp_web_access,
         public string $cookie_directory,
         public array $sizes,
         public LivePhotoVersionSize $live_photo_size,

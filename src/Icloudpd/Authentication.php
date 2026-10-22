@@ -104,6 +104,14 @@ final class Authentication
         echo $message . "\n";
     }
 
+    /** `PyiCloudService(...)` (the constructor): a patchable factory, as the upstream tests patch `icloudpd.authentication.PyiCloudService`. */
+    public static function PyiCloudService(mixed ...$args): PyiCloudService
+    {
+        if ($p = Patch::get(__METHOD__)) return $p(...$args);
+
+        return new PyiCloudService(...$args);
+    }
+
     /**
      * Authenticate with iCloud username and password
      *
@@ -121,6 +129,7 @@ final class Authentication
         ?callable $response_observer = null,
         ?string $cookie_directory = null,
         ?string $client_id = null,
+        bool $adp_web_access = false,
     ): PyiCloudService {
         $logger->debug("Authenticating...");
         $valid_password = [];
@@ -137,7 +146,7 @@ final class Authentication
             return null;
         };
 
-        $icloud = new PyiCloudService(
+        $icloud = self::PyiCloudService(
             $domain,
             $username,
             fn() => $password_provider($username),
@@ -166,6 +175,10 @@ final class Authentication
             $logger->info("Two-step authentication is required (2sa)");
             $notificator();
             self::request_2sa($icloud, $logger);
+        }
+
+        if ($adp_web_access) {
+            $icloud->request_pcs_consent("photos");
         }
 
         return $icloud;

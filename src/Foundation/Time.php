@@ -3,7 +3,7 @@
 namespace Foundation;
 
 /**
- * Python's `time` module (patchable, see `Foundation\Patch`): `time.sleep` and `time.time`.
+ * Python's `time` module (patchable, see `Foundation\Patch`): `time.sleep`, `time.time` and `time.monotonic`.
  */
 final class Time
 {
@@ -26,5 +26,14 @@ final class Time
             return $p();
         }
         return microtime(true);
+    }
+
+    /** `time.monotonic()`: seconds of a clock that cannot go backwards, as a float */
+    public static function monotonic(): float
+    {
+        if ($p = Patch::get(__METHOD__)) {
+            return $p();
+        }
+        return hrtime(true) / 1e9;
     }
 }
