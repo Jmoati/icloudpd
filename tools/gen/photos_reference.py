@@ -5,8 +5,8 @@ Replays the upstream VCR cassettes (tests/vcr_cassettes/*.yml of icloud_photos_d
 the *Python* PyiCloudService / PhotosService and prints, as JSON, the HTTP requests sent and the
 values computed from the responses (filenames, dates, item types, versions, download URLs...).
 
-    cd ~/icloud_photos_downloader && TZ=Etc/UTC .venv/bin/python -I ~/Sites/icloudpd/var/photos_reference.py > expected_utc.json
-    cd ~/icloud_photos_downloader && TZ=Europe/Paris .venv/bin/python -I ~/Sites/icloudpd/var/photos_reference.py > expected_paris.json
+    cd ~/icloud_photos_downloader && TZ=Etc/UTC .venv/bin/python -I ~/Sites/icloudpd/tools/gen/photos_reference.py > expected_utc.json
+    cd ~/icloud_photos_downloader && TZ=Europe/Paris .venv/bin/python -I ~/Sites/icloudpd/tools/gen/photos_reference.py > expected_paris.json
 
 The scenarios mimic what icloudpd/base.py does with the photos service (list libraries, list albums,
 `len(album)` then `islice(album, n)`), so that the requests are the same as in the upstream tests.
