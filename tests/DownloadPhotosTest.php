@@ -21,6 +21,7 @@ class DownloadPhotosTest extends TestCase
     /** unittest.mock.ANY */
     private const ANY = "\0mock.ANY\0";
 
+    private const RESPONSE_OK = 'Foundation\Http\Response::ok';
     private const PHOTO_ASSET_DOWNLOAD = 'PyicloudIpd\Services\Photos\PhotoAsset::download';
     private const PHOTO_ASSET_VERSIONS = 'PyicloudIpd\Services\Photos\PhotoAsset::versions';
     private const PHOTO_ASSET_CREATED = 'PyicloudIpd\Services\Photos\PhotoAsset::created';
@@ -779,10 +780,8 @@ class DownloadPhotosTest extends TestCase
     {
         $base_dir = Os::path_join($this->fixtures_path, __FUNCTION__);
 
-        // `mock.patch.object(Response, "ok")` with `__get__` returning False, and `download` returning a bare
-        // `Response()`: the response the download gets is not ok.
-        // ponytail: only the response returned by `download` is not ok here, Response::ok stays real elsewhere
-        Patch::set(self::PHOTO_ASSET_DOWNLOAD, fn(...$_args) => new Response(404, [], ''));
+        Patch::set(self::RESPONSE_OK, fn(...$_args) => false);
+        Patch::set(self::PHOTO_ASSET_DOWNLOAD, fn(...$_args) => new Response());
 
         [$data_dir, $result] = Helpers::run_icloudpd_test(
             $this->assertEqual(...),
@@ -973,8 +972,10 @@ class DownloadPhotosTest extends TestCase
         });
 
         $versions = $this->versions_dict([
-            [AssetVersionSize::ORIGINAL, ['filename' => 'IMG1.JPG']],
-            [AssetVersionSize::MEDIUM, ['filename' => 'IMG_1.JPG']],
+            // ponytail: upstream puts dicts ({"filename": "IMG1.JPG"}, {"filename": "IMG_1.JPG"}) here, which nothing
+            // reads (the thumb size is missing and forced); the port types the versions as AssetVersion
+            [AssetVersionSize::ORIGINAL, new AssetVersion(1, 'http', 'jpeg', 'blah')],
+            [AssetVersionSize::MEDIUM, new AssetVersion(2, 'ftp', 'movie', 'blah')],
         ]);
         Patch::set(self::PHOTO_ASSET_VERSIONS, fn(...$_args) => $versions);
 
