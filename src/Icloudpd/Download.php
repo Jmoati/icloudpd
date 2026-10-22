@@ -23,7 +23,7 @@ final class Download
     /**
      * Set the modification time of the downloaded file to the photo creation date
      */
-    public static function update_mtime(\DateTimeInterface $created, string $download_path): void
+    public static function update_mtime(\DateTimeImmutable $created, string $download_path): void
     {
         if ($created) {
             // ponytail: no `except (ValueError, OSError)` around the conversion (the "silently return
@@ -38,16 +38,9 @@ final class Download
      */
     public static function set_utime(string $download_path, \DateTimeInterface $created_date): void
     {
-        // ponytail: time.mktime(timetuple()) = wall-clock fields read as local time; mktime() cannot
-        // overflow on 64-bit, so the 1970-01-01 fallback of the OverflowError branch is not ported
-        $ctime = mktime(
-            (int) $created_date->format('G'),
-            (int) $created_date->format('i'),
-            (int) $created_date->format('s'),
-            (int) $created_date->format('n'),
-            (int) $created_date->format('j'),
-            (int) $created_date->format('Y'),
-        );
+        // ponytail: time.mktime(created_date.timetuple()) turns the local wall-clock fields back into an
+        // instant, which is the timestamp itself (no OverflowError fallback to 1970-01-01 either)
+        $ctime = $created_date->getTimestamp();
         Os::utime($download_path, [$ctime, $ctime]);
     }
 
@@ -128,7 +121,7 @@ final class Download
         string $temp_download_path,
         bool $append_mode,
         string $download_path,
-        \DateTimeInterface $created_date,
+        \DateTimeImmutable $created_date,
     ): bool {
         $file_obj = self::open($temp_download_path, $append_mode ? "ab" : "wb");
         try {
@@ -154,7 +147,7 @@ final class Download
         string $_temp_download_path,
         bool $_append_mode,
         string $download_path,
-        \DateTimeInterface $_created_date,
+        \DateTimeImmutable $_created_date,
     ): bool {
         $logger->info(
             "[DRY RUN] Would download %s",

@@ -17,6 +17,7 @@ use Foundation\Py;
 use Foundation\StringUtils;
 use Foundation\Time;
 use Foundation\Tqdm;
+use Icloudpd\Authentication\SystemExit;
 use Icloudpd\Config\GlobalConfig;
 use Icloudpd\Config\UserConfig;
 use Icloudpd\Counter\Counter;
@@ -247,6 +248,20 @@ final class Base
      * @param UserConfig[] $user_configs
      */
     public static function run_with_configs(GlobalConfig $global_config, array $user_configs): int
+    {
+        try {
+            return self::_run_with_configs($global_config, $user_configs);
+        } catch (SystemExit $exit) {
+            // ponytail: `sys.exit(code)` (request_2sa) ends the Python process with that status; here
+            // the run ends and the entry point gets the code as its return value
+            return $exit->getCode();
+        }
+    }
+
+    /**
+     * @param UserConfig[] $user_configs
+     */
+    private static function _run_with_configs(GlobalConfig $global_config, array $user_configs): int
     {
         // Create shared logger
         $logger = self::create_logger($global_config);
@@ -1331,7 +1346,9 @@ final class Base
                 // these errors we can safely retry
                 continue;
             } catch (\Throwable $e) {
-                self::dump_responses($logger->debug(...), $captured_responses);
+                if (!($e instanceof SystemExit)) { // SystemExit is not an `Exception`
+                    self::dump_responses($logger->debug(...), $captured_responses);
+                }
                 throw $e;
             }
 
