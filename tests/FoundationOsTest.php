@@ -13,7 +13,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * `Foundation\Os`, `Time` and `Clock`. The `os.path` cases come from Python's `posixpath`
- * (Python 3.13): generated, do not edit the data by hand.
+ * (Python 3.13), produced by running Python.
  */
 class FoundationOsTest extends TestCase
 {

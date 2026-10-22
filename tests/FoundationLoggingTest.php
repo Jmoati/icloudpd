@@ -16,7 +16,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * `Foundation\Logging`: the hierarchy, propagation, filters, handlers, `lastResort`, `basicConfig`, and
- * the `Filter`, `Formatter` and `getLevelName` outputs of Python 3.13 (generated, do not edit the data).
+ * the `Filter`, `Formatter` and `getLevelName` outputs of Python 3.13 (the data providers were produced by running Python).
  */
 class FoundationLoggingTest extends TestCase
 {

@@ -108,6 +108,8 @@ final class Py
 
     private static function str_repr(string $s): string
     {
+        // ponytail: "printable" comes from PCRE's Unicode tables, which can be newer than Python's: a recently
+        // assigned character is printed here and escaped (\U...) by Python 3.13 (Unicode 15.1)
         // Python picks double quotes only when the string has a single quote and no double quote
         $q = (str_contains($s, "'") && !str_contains($s, '"')) ? '"' : "'";
         $out = preg_replace_callback('/[\\\\'.$q.']|\p{C}|(?!\x20)\p{Z}/u', function ($m) {

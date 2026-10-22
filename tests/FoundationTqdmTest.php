@@ -11,8 +11,8 @@ use Foundation\Tqdm;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
- * `Foundation\Tqdm`. `format_meter` and `format_interval` are compared with tqdm 4.67.1 (generated, do
- * not edit the data); the rest is the behaviour icloudpd relies on.
+ * `Foundation\Tqdm`. `format_meter` and `format_interval` are compared with tqdm 4.67.1 (the data
+ * providers were produced by running Python); the rest is the behaviour icloudpd relies on.
  */
 class FoundationTqdmTest extends TestCase
 {

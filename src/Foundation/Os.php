@@ -64,6 +64,12 @@ final class Os
         if ($i === false) {
             $i = strlen($path);
         }
+        if (!function_exists('posix_getpwuid')) {
+            // ponytail: without ext-posix only `~` with $HOME is expanded
+            if ($i !== 1 || getenv('HOME') === false) {
+                return $path;
+            }
+        }
         if ($i === 1) {
             $userhome = getenv('HOME');
             if ($userhome === false) {

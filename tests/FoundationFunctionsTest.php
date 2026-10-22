@@ -14,7 +14,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * The rest of `foundation` (what the doctests and `test_json_rules` do not reach): `Foundation`, `Core`,
- * `Json`, `String_`, `StringUtils`. Expected values of the providers come from Python (generated).
+ * `Json`, `String_`, `StringUtils`. Expected values of the providers were produced by running Python.
  */
 class FoundationFunctionsTest extends TestCase
 {

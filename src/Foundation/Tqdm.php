@@ -209,7 +209,7 @@ final class Tqdm implements \IteratorAggregate, \Stringable
             $this->n,
             $this->total,
             Time::time() - $this->start_t,
-            $this->dynamic_ncols ? $this->screen_width() : $this->ncols,
+            $this->ncols,
             $this->desc,
             $this->ascii,
             $this->unit,
@@ -289,12 +289,18 @@ final class Tqdm implements \IteratorAggregate, \Stringable
         return mb_substr($res, 0, $width);
     }
 
-    /** `COLUMNS - 1`, or null when unknown (a 10 character bar) */
+    /** The width of the terminal when the bar goes to one, null otherwise (a 10 character bar) */
     private function screen_width(): ?int
     {
-        // ponytail: tqdm asks the terminal (ioctl); here the COLUMNS environment variable only
-        $cols = getenv('COLUMNS');
-        return $cols !== false && ctype_digit($cols) ? (int) $cols - 1 : null;
+        // ponytail: tqdm asks the terminal with an ioctl; here `stty size` on the controlling terminal, once per
+        // process (a resize is not followed), and nothing without a terminal
+        static $cache = [];
+        $key = (int) $this->fp;
+        if (!array_key_exists($key, $cache)) {
+            $size = stream_isatty($this->fp) && function_exists('shell_exec') ? @shell_exec('stty size </dev/tty 2>/dev/null') : null;
+            $cache[$key] = $size !== null && preg_match('/^\d+ (\d+)/', $size, $m) ? (int) $m[1] : null;
+        }
+        return $cache[$key];
     }
 
     /** `tqdm.write(s, file=None, end="\n")` */

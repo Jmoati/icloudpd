@@ -8,7 +8,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 /**
  * `Foundation\Py` against Python 3.13: the expected values below were produced by Python itself
  * (`str`, `repr`, `datetime.strftime`, `str.format`, `%`, `json.dumps`) from the same inputs, with TZ=Etc/UTC.
- * `['!' => 'ValueError']` is an expected Python exception. Generated: do not edit the data by hand.
+ * `['!' => 'ValueError']` is an expected Python exception. The data providers were produced by running Python, not written by hand.
  */
 class PyTest extends TestCase
 {
