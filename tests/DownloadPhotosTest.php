@@ -6,6 +6,7 @@ use Foundation\Http\Response;
 use Foundation\Os;
 use Foundation\Patch;
 use Icloudpd\Constants;
+use Icloudpd\ExifDatetime\InvalidImageDataError;
 use PyicloudIpd\AssetVersion\AssetVersion;
 use PyicloudIpd\Base\PyiCloudService;
 use PyicloudIpd\Exceptions\PyiCloudAPIResponseException;
@@ -30,7 +31,8 @@ class DownloadPhotosTest extends TestCase
     private const DOWNLOAD_OPEN = 'Icloudpd\Download::open';
     private const BASE_DELETE_PHOTO = 'Icloudpd\Base::delete_photo';
     private const GET_PHOTO_EXIF = 'Icloudpd\ExifDatetime::get_photo_exif';
-    private const SET_PHOTO_EXIF = 'Icloudpd\ExifDatetime::set_photo_exif';
+    private const PIEXIF_LOAD = 'Icloudpd\ExifDatetime::piexif_load';
+    private const PIEXIF_INSERT = 'Icloudpd\ExifDatetime::piexif_insert';
     private const TIME_SLEEP = 'Foundation\Time::sleep';
     private const OS_UTIME = 'Foundation\Os::utime';
     private const OS_MAKEDIRS = 'Foundation\Os::makedirs';
@@ -103,23 +105,19 @@ class DownloadPhotosTest extends TestCase
         Patch::set(self::PYICLOUD_SERVICE_AUTHENTICATE, $mocked_authenticate);
     }
 
-    /** `mock.patch.object(piexif, "load")` with `side_effect = InvalidImageDataError`: both functions end in their except branch */
+    /** `mock.patch.object(piexif, "load")` with `side_effect = InvalidImageDataError` */
     private function patch_piexif_load_invalid_image_data(): void
     {
-        Patch::set(self::GET_PHOTO_EXIF, function ($logger, string $path) {
-            $logger->debug('Error fetching EXIF data for %s', $path);
-            return null;
-        });
-        Patch::set(self::SET_PHOTO_EXIF, function ($logger, string $path, string $date): void {
-            $logger->debug('Error setting EXIF data for %s', $path);
+        Patch::set(self::PIEXIF_LOAD, function (...$_args): never {
+            throw new InvalidImageDataError();
         });
     }
 
-    /** `mock.patch.object(piexif, "insert")` with `side_effect = InvalidImageDataError`: set_photo_exif ends in its except branch */
+    /** `mock.patch.object(piexif, "insert")` with `side_effect = InvalidImageDataError` */
     private function patch_piexif_insert_invalid_image_data(): void
     {
-        Patch::set(self::SET_PHOTO_EXIF, function ($logger, string $path, string $date): void {
-            $logger->debug('Error setting EXIF data for %s', $path);
+        Patch::set(self::PIEXIF_INSERT, function (...$_args): never {
+            throw new InvalidImageDataError();
         });
     }
 
@@ -1942,11 +1940,11 @@ class DownloadPhotosTest extends TestCase
         $base_dir = Os::path_join($this->fixtures_path, __FUNCTION__);
 
         // Raise IOError when we try to write to the destination file
-        $my_makedirs = function (string $name, int $mode = 0777, bool $exist_ok = false) use ($base_dir): void {
+        $my_makedirs = function (string $name, bool $exist_ok = false, int $mode = 0777) use ($base_dir): void {
             if (strcmp($name, Helpers::calc_data_dir($base_dir)) > 0) {
                 throw new \Foundation\OSError();
             }
-            $this->call_original(self::OS_MAKEDIRS, fn() => Os::makedirs($name, $mode, $exist_ok));
+            $this->call_original(self::OS_MAKEDIRS, fn() => Os::makedirs($name, $exist_ok, $mode));
         };
         Patch::set(self::OS_MAKEDIRS, $my_makedirs);
 
