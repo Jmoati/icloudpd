@@ -1,0 +1,8 @@
+#!/usr/bin/env php
+<?php
+
+// entry point of `src/starters/icloud.py` (the `icloud` script runs `main()`, which ends with `sys.exit(code)`)
+
+require $GLOBALS['_composer_autoload_path'] ?? __DIR__ . '/../vendor/autoload.php';
+
+exit(\PyicloudIpd\Cmdline::main());
