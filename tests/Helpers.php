@@ -287,8 +287,12 @@ final class Helpers
         $original_input = Patch::get($input_method);
         $icloudpd_logger = null;
         $capture_handler = null;
+        $restore_logging = null;
 
         try {
+            // what pytest does to the logging of the process
+            $restore_logging = self::pytest_logging();
+
             // Add a handler to capture icloudpd logging output
             $icloudpd_logger = Logging::getLogger('icloudpd');
             $capture_handler = new StreamHandler(Py::stdout());
@@ -336,6 +340,9 @@ final class Helpers
             // Remove the capture handler
             if ($capture_handler !== null) {
                 $icloudpd_logger->removeHandler($capture_handler);
+            }
+            if ($restore_logging !== null) {
+                $restore_logging();
             }
             $raw_output = (string) ob_get_clean();
             Argparse::$stderr = null;
@@ -446,12 +453,7 @@ final class Helpers
 
     public static function run_with_cassette(string $cassette_path, callable $f, mixed $inp): mixed
     {
-        $restore_logging = self::pytest_logging();
-        try {
-            return Vcr::use_cassette($cassette_path, fn() => $f($inp));
-        } finally {
-            $restore_logging();
-        }
+        return Vcr::use_cassette($cassette_path, fn() => $f($inp));
     }
 
     /**
@@ -460,15 +462,10 @@ final class Helpers
      */
     public static function run_cassette(string $cassette_path, array $params, mixed $input = null): TestResult
     {
-        $restore_logging = self::pytest_logging();
-        try {
-            return Vcr::use_cassette(
-                $cassette_path,
-                fn() => self::print_result_exception(self::run_main_env(self::DEFAULT_ENV, $params, $input)),
-            );
-        } finally {
-            $restore_logging();
-        }
+        return Vcr::use_cassette(
+            $cassette_path,
+            fn() => self::print_result_exception(self::run_main_env(self::DEFAULT_ENV, $params, $input)),
+        );
     }
 
     /**
