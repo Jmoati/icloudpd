@@ -496,6 +496,22 @@ final class Base
         return 0;
     }
 
+    /**
+     * `subprocess.call(args)`: runs the command (no shell) with the standard streams of the process and
+     * returns its exit status (patchable: the upstream tests replace `subprocess.call`)
+     *
+     * @param list<string> $args
+     */
+    public static function subprocess_call(array $args): int
+    {
+        if ($p = Patch::get(__METHOD__)) return $p($args);
+        $process = @proc_open($args, [0 => STDIN, 1 => STDOUT, 2 => STDERR], $pipes);
+        if ($process === false) {
+            throw new \Foundation\OSError("[Errno 2] No such file or directory: " . Py::repr($args[0]));
+        }
+        return proc_close($process);
+    }
+
     public static function notificator_builder(
         Logger $logger,
         string $username,
@@ -511,12 +527,7 @@ final class Base
         try {
             if ($notification_script !== null) {
                 $logger->debug("Executing notification script...");
-                // subprocess.call([notification_script])
-                $process = @proc_open([$notification_script], [0 => STDIN, 1 => STDOUT, 2 => STDERR], $pipes);
-                if ($process === false) {
-                    throw new \Foundation\OSError("Cannot execute {$notification_script}");
-                }
-                proc_close($process);
+                self::subprocess_call([$notification_script]);
             }
             if ($smtp_username !== null || $notification_email !== null) {
                 EmailNotifications::send_2sa_notification(
@@ -1088,10 +1099,9 @@ final class Base
 
                         $logger->debug("Looking up all {$photo_video_phrase}{$album_phrase}...");
 
-                        $library_albums = $library_object->albums();
                         $albums = count($user_config->albums) > 0
                             ? array_map(
-                                fn(string $name) => $library_albums[$name]
+                                fn(string $name) => $library_object->albums()[$name]
                                     ?? throw new \OutOfBoundsException(Py::repr($name)), // KeyError
                                 $user_config->albums,
                             )
