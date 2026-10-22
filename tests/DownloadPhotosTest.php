@@ -129,6 +129,16 @@ class DownloadPhotosTest extends TestCase
         Patch::set(self::GET_PHOTO_EXIF, fn(...$_args) => false);
     }
 
+    /** `{AssetVersionSize.ORIGINAL: ..., ...}`: a dict keyed by enum members is a `WeakMap` in the port */
+    private function versions_dict(array $pairs): \WeakMap
+    {
+        $versions = new \WeakMap();
+        foreach ($pairs as [$size, $version]) {
+            $versions[$size] = $version;
+        }
+        return $versions;
+    }
+
     private function call_matches(array $expected, array $actual): bool
     {
         if (count($expected) !== count($actual)) {
@@ -558,7 +568,7 @@ class DownloadPhotosTest extends TestCase
 
         // Raise IOError when we try to write to the destination file
         Patch::set(self::DOWNLOAD_OPEN, function (...$_args): never {
-            throw new \RuntimeException();
+            throw new \Foundation\OSError();
         });
 
         [$data_dir, $result] = Helpers::run_icloudpd_test(
@@ -641,7 +651,7 @@ class DownloadPhotosTest extends TestCase
 
         // Error msg should be repeated 5 times
         $this->assertSame(
-            max(1, Constants::MAX_RETRIES),
+            max(1, Constants::$MAX_RETRIES),
             substr_count($result->output, 'Session error, re-authenticating...'),
             'retry count',
         );
@@ -653,7 +663,7 @@ class DownloadPhotosTest extends TestCase
 
         // Make sure we only call sleep 4 times (skip the first retry)
         $this->assertSame(
-            max(0, Constants::MAX_RETRIES - 1),
+            max(0, Constants::$MAX_RETRIES - 1),
             $sleep_count,
             'sleep count',
         );
@@ -703,7 +713,7 @@ class DownloadPhotosTest extends TestCase
 
         // Error msg should be repeated 5 times
         $this->assertSame(
-            max(0, Constants::MAX_RETRIES),
+            max(0, Constants::$MAX_RETRIES),
             substr_count($result->output, 'Session error, re-authenticating...'),
             'retry count',
         );
@@ -714,7 +724,7 @@ class DownloadPhotosTest extends TestCase
         );
         // Make sure we only call sleep 4 times (skip the first retry)
         $this->assertSame(
-            max(0, Constants::MAX_RETRIES - 1),
+            max(0, Constants::$MAX_RETRIES - 1),
             $sleep_count,
             'sleep count',
         );
@@ -848,10 +858,11 @@ class DownloadPhotosTest extends TestCase
 
         Patch::set(self::OS_UTIME, fn(...$_args) => null);
 
-        Patch::set(self::PHOTO_ASSET_VERSIONS, fn(...$_args) => [
-            AssetVersionSize::ORIGINAL->value => new AssetVersion(1, 'http', 'jpeg', 'blah'),
-            AssetVersionSize::MEDIUM->value => new AssetVersion(2, 'ftp', 'movie', 'blah'),
+        $versions = $this->versions_dict([
+            [AssetVersionSize::ORIGINAL, new AssetVersion(1, 'http', 'jpeg', 'blah')],
+            [AssetVersionSize::MEDIUM, new AssetVersion(2, 'ftp', 'movie', 'blah')],
         ]);
+        Patch::set(self::PHOTO_ASSET_VERSIONS, fn(...$_args) => $versions);
 
         [$data_dir, $result] = Helpers::run_icloudpd_test(
             $this->assertEqual(...),
@@ -905,10 +916,11 @@ class DownloadPhotosTest extends TestCase
 
         Patch::set(self::OS_UTIME, fn(...$_args) => null);
 
-        Patch::set(self::PHOTO_ASSET_VERSIONS, fn(...$_args) => [
-            AssetVersionSize::ORIGINAL->value => new AssetVersion(1, 'http', 'jpeg', 'blah'),
+        $versions = $this->versions_dict([
+            [AssetVersionSize::ORIGINAL, new AssetVersion(1, 'http', 'jpeg', 'blah')],
             // AssetVersionSize.ADJUSTED: AssetVersion("IMG_7409.JPG", 2, "ftp", "movie"),
         ]);
+        Patch::set(self::PHOTO_ASSET_VERSIONS, fn(...$_args) => $versions);
 
         [$data_dir, $result] = Helpers::run_icloudpd_test(
             $this->assertEqual(...),
@@ -962,10 +974,11 @@ class DownloadPhotosTest extends TestCase
             return true;
         });
 
-        Patch::set(self::PHOTO_ASSET_VERSIONS, fn(...$_args) => [
-            AssetVersionSize::ORIGINAL->value => ['filename' => 'IMG1.JPG'],
-            AssetVersionSize::MEDIUM->value => ['filename' => 'IMG_1.JPG'],
+        $versions = $this->versions_dict([
+            [AssetVersionSize::ORIGINAL, ['filename' => 'IMG1.JPG']],
+            [AssetVersionSize::MEDIUM, ['filename' => 'IMG_1.JPG']],
         ]);
+        Patch::set(self::PHOTO_ASSET_VERSIONS, fn(...$_args) => $versions);
 
         [$data_dir, $result] = Helpers::run_icloudpd_test(
             $this->assertEqual(...),
@@ -1019,10 +1032,11 @@ class DownloadPhotosTest extends TestCase
 
         Patch::set(self::OS_UTIME, fn(...$_args) => null);
 
-        Patch::set(self::PHOTO_ASSET_VERSIONS, fn(...$_args) => [
-            AssetVersionSize::ORIGINAL->value => new AssetVersion(1, 'http', 'jpeg', 'blah'),
-            AssetVersionSize::THUMB->value => new AssetVersion(1, 'http', 'jpeg', 'blah'),
+        $versions = $this->versions_dict([
+            [AssetVersionSize::ORIGINAL, new AssetVersion(1, 'http', 'jpeg', 'blah')],
+            [AssetVersionSize::THUMB, new AssetVersion(1, 'http', 'jpeg', 'blah')],
         ]);
+        Patch::set(self::PHOTO_ASSET_VERSIONS, fn(...$_args) => $versions);
 
         [$data_dir, $result] = Helpers::run_icloudpd_test(
             $this->assertEqual(...),
@@ -1854,7 +1868,7 @@ class DownloadPhotosTest extends TestCase
 
         // Error msg should be repeated 5 times
         $this->assertSame(
-            Constants::MAX_RETRIES,
+            Constants::$MAX_RETRIES,
             substr_count($result->output, 'Error downloading'),
             'retry count',
         );
@@ -1865,7 +1879,7 @@ class DownloadPhotosTest extends TestCase
         );
 
         // Make sure we only call sleep 4 times (skip the first retry)
-        $this->assertSame(Constants::MAX_RETRIES, $sleep_count, 'sleep count');
+        $this->assertSame(Constants::$MAX_RETRIES, $sleep_count, 'sleep count');
         $this->assertSame(0, $result->exit_code, 'Exit Code');
     }
 
@@ -1907,7 +1921,7 @@ class DownloadPhotosTest extends TestCase
 
         // Error msg should be repeated 5 times
         $this->assertSame(
-            Constants::MAX_RETRIES,
+            Constants::$MAX_RETRIES,
             substr_count($result->output, 'Internal Error at Apple, retrying...'),
             'retry count',
         );
@@ -1918,7 +1932,7 @@ class DownloadPhotosTest extends TestCase
         );
 
         // Make sure we only call sleep 4 times (skip the first retry)
-        $this->assertSame(Constants::MAX_RETRIES, $sleep_count, 'sleep count');
+        $this->assertSame(Constants::$MAX_RETRIES, $sleep_count, 'sleep count');
 
         $this->assertSame(1, $result->exit_code, 'Exit Code');
     }
@@ -1930,7 +1944,7 @@ class DownloadPhotosTest extends TestCase
         // Raise IOError when we try to write to the destination file
         $my_makedirs = function (string $name, int $mode = 0777, bool $exist_ok = false) use ($base_dir): void {
             if (strcmp($name, Helpers::calc_data_dir($base_dir)) > 0) {
-                throw new \RuntimeException();
+                throw new \Foundation\OSError();
             }
             $this->call_original(self::OS_MAKEDIRS, fn() => Os::makedirs($name, $mode, $exist_ok));
         };
